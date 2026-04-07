@@ -1,8 +1,9 @@
 open! Core
 open Types
 
-(** Register-based language that allows for function definitions. Don't need to
-    worry about saving registers when calling/returning from functions. *)
+(** Register-based instruction set that allows for function definitions. Don't
+    need to worry about saving registers when calling/returning from functions.
+*)
 module Register_func_instrs = struct
   type expr =
     | Register of Register.t
@@ -39,7 +40,7 @@ module Register_func_instrs = struct
   type t = { functions : function_def list; main : stmt list } [@@deriving sexp]
 end
 
-(** Register-based language that has a per-register stack (instead of
+(** Register-based instruction set that has a per-register stack (instead of
     functions). *)
 module Register_stack_instrs = struct
   type expr =
@@ -59,20 +60,21 @@ module Register_stack_instrs = struct
   type stmt =
     | Set of Register.t * expr
     | Jump of { conds : (expr * Label.t) list; default : Label.t }
+    | Label of Label.t
     | Push of Register.t
     | Pop of Register.t
     | Link_push of Label.t  (** call to Link_pop_jump will go to the label *)
     | Link_pop_jump
   [@@deriving sexp]
 
-  type t = { main : stmt list } [@@deriving sexp]
+  type t = stmt list [@@deriving sexp]
 end
 
-module Register_stack_multi_instrs = struct end
-(** Register-based language that allows for calling any number of statements at
-    a time. At any given time a register can be modified at most once, and reads
-    of the register will be from before the modification. The program counter
-    update is explicit. *)
+module Desmos_virtual_machine = struct end
+(** Register-based instruction set that allows for calling any number of
+    statements at a time. At any given time a register can be modified at most
+    once, and reads of the register will be from before the modification. The
+    program counter update is also explicit in this instruction set. *)
 
 module Desmos_output = struct end
 (** The output to desmos, including the runtime environment necessary to execute
