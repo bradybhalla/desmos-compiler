@@ -1,6 +1,6 @@
 (library
  (name test_desmos_compiler)
  (inline_tests)
- (libraries core)
+ (libraries desmos_compiler core)
  (preprocess
   (pps ppx_jane)))
