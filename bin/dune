@@ -1,5 +1,6 @@
 (executable
-  (public_name desmos-compiler)
-  (name        main)
-  (libraries desmos_compiler core)
-  (preprocess (pps ppx_jane)))
+ (public_name desmos-compiler)
+ (name main)
+ (libraries desmos_compiler core)
+ (preprocess
+  (pps ppx_jane)))
