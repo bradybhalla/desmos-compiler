@@ -55,3 +55,54 @@ let compile_main =
             Jump { conds = []; default = JumpToRegister link_register } )
   in
   List.map ~f:compile_stmt
+
+let extract_registers =
+  let open Desmos_virtual_machine in
+  let rec registers_in_expr = function
+    | Register r -> Register.Set.singleton r
+    | ProgramCounter | Num _ | Bool _ -> Register.Set.empty
+    | Add (a, b) | Sub (a, b) | Mult (a, b) | Div (a, b) | And (a, b) | Or (a, b)
+      ->
+        Set.union (registers_in_expr a) (registers_in_expr b)
+    | Not e -> registers_in_expr e
+  in
+
+  let registers_in_jump_target = function
+    | JumpToRegister r -> Register.Set.singleton r
+    | JumpToLabel _ -> Register.Set.empty
+  in
+
+  let registers_in_pc_action = function
+    | NextInstr -> Register.Set.empty
+    | Jump { conds; default } ->
+        let cond_regs =
+          List.map conds ~f:(fun (expr, target) ->
+              Set.union (registers_in_expr expr)
+                (registers_in_jump_target target))
+          |> Register.Set.union_list
+        in
+        Set.union cond_regs (registers_in_jump_target default)
+  in
+
+  let registers_in_stmt = function
+    | Label _ -> Register.Set.empty
+    | Instruction (sets, pc_action) ->
+        let set_regs =
+          List.map sets ~f:(fun (reg, action) ->
+              let expr_regs =
+                match action with
+                | Set expr | PushAndSet expr -> registers_in_expr expr
+                | Push | Pop -> Register.Set.empty
+              in
+              Set.add expr_regs reg)
+          |> Register.Set.union_list
+        in
+        Set.union set_regs (registers_in_pc_action pc_action)
+  in
+
+  fun stmts -> List.map stmts ~f:registers_in_stmt |> Register.Set.union_list
+
+let compile program =
+  let main = compile_main program in
+  let registers = extract_registers main in
+  { Desmos_virtual_machine.main; registers }
