@@ -79,10 +79,11 @@ end
     once, and reads of the register will be from before the modification. The
     program counter update is also explicit in this instruction set. *)
 module Desmos_virtual_machine = struct
-  let link_register = ".link"
+  let link_register = Register.of_string ".link"
 
   type expr =
     | Register of Register.t
+    | ProgramCounter
     | Num of float
     | Bool of bool
     | Add of expr * expr
@@ -98,7 +99,7 @@ module Desmos_virtual_machine = struct
   [@@deriving sexp]
 
   (* TODO brady: for better optimization might need specially handle function calls instead of allowing general registers? *)
-  type jump_target = Label of Label.t | Register of Register.t
+  type jump_target = JumpToLabel of Label.t | JumpToRegister of Register.t
   [@@deriving sexp]
 
   type pc_action =
@@ -109,10 +110,10 @@ module Desmos_virtual_machine = struct
   (* TODO brady: maybe consider grouping by labels instead of integrating them with the code? this would need to start at an earlier language. Then each group would be defined by (stmt list, jump). Honestly this could make things a lot nicer. *)
   type stmt =
     | Label of Label.t
-    | Instruction of generalized_set list * pc_action
+    | Instruction of (Register.t * generalized_set) list * pc_action
   [@@deriving sexp]
 
-  type t = stmt list [@@deriving sexp]
+  type t = { main : stmt list; registers : Register.Set.t } [@@deriving sexp]
 end
 
 module Desmos_output = struct end
