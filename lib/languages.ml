@@ -107,12 +107,11 @@ module Desmos_virtual_machine = struct
     | Jump of { conds : (expr * jump_target) list; default : jump_target }
   [@@deriving sexp]
 
-  (* TODO brady: maybe consider grouping by labels instead of integrating them with the code? this would need to start at an earlier language. Then each group would be defined by (stmt list, jump). Honestly this could make things a lot nicer. *)
-  type stmt =
-    | Label of Label.t
-    | Instruction of (Register.t * generalized_set) list * pc_action
+  type instruction = (Register.t * generalized_set) list * pc_action
   [@@deriving sexp]
 
+  (* TODO brady: maybe consider grouping by labels instead of integrating them with the code? this would need to start at an earlier language. Then each group would be defined by (stmt list, jump). Honestly this could make things a lot nicer. *)
+  type stmt = Label of Label.t | Instruction of instruction [@@deriving sexp]
   type t = { main : stmt list; registers : Register.Set.t } [@@deriving sexp]
 end
 

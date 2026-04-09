@@ -83,20 +83,25 @@ let%expect_test "compile arithmetic program" =
   |> Register_stack_instrs.sexp_of_t |> print_s;
   [%expect
     {|
-    ((Set x (Num 1)) (Set y (Num 2)) (Set z (Num 2))
+    ((GeneralizedSet ((x (Set (Num 1))))) (GeneralizedSet ((y (Set (Num 2)))))
+     (GeneralizedSet ((z (Set (Num 2)))))
      (GeneralizedSet
       ((x (PushAndSet (Register x))) (y (PushAndSet (Register y)))
        (z (PushAndSet (Register y)))))
      (Link_push_jump function_entrypoint_g)
-     (GeneralizedSet ((x Pop) (y Pop) (z Pop))) (Set x (Register .ret))
-     (Label function_entrypoint_f) (Set z (Add (Register z) (Register x)))
-     (Set z (Add (Register z) (Register y))) (Set .ret (Register z))
-     Link_pop_jump (Label function_entrypoint_g)
+     (GeneralizedSet ((x Pop) (y Pop) (z Pop)))
+     (GeneralizedSet ((x (Set (Register .ret))))) (Label function_entrypoint_f)
+     (GeneralizedSet ((z (Set (Add (Register z) (Register x))))))
+     (GeneralizedSet ((z (Set (Add (Register z) (Register y))))))
+     (GeneralizedSet ((.ret (Set (Register z))))) Link_pop_jump
+     (Label function_entrypoint_g)
      (GeneralizedSet
       ((x (PushAndSet (Register x))) (y (PushAndSet (Register y)))
        (z (PushAndSet (Register y))) (w Push)))
      (Link_push_jump function_entrypoint_f)
-     (GeneralizedSet ((w Pop) (x Pop) (y Pop) (z Pop))) (Set w (Register .ret))
-     (Set .ret (Mult (Register x) (Mult (Register y) (Register z))))
+     (GeneralizedSet ((w Pop) (x Pop) (y Pop) (z Pop)))
+     (GeneralizedSet ((w (Set (Register .ret)))))
+     (GeneralizedSet
+      ((.ret (Set (Mult (Register x) (Mult (Register y) (Register z)))))))
      Link_pop_jump)
     |}]
