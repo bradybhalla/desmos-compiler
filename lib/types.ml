@@ -20,3 +20,7 @@ module Function_name =
       let module_name = "Function_name"
     end)
     ()
+
+module Compare_op = struct
+  type t = Eq | Lt | Gt | Ge | Le | Ne [@@deriving sexp]
+end

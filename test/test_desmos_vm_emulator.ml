@@ -88,52 +88,44 @@ let%expect_test "run add program" =
   in
   let t = Desmos_vm_emulator.create add_program in
   run_until_done t;
-  [%expect {|
-    (((x (Set (Num 3))) (y (Set (Num 4)))) NextInstr)
+  [%expect
+    {|
     Reg: result, Value: 0.00 ()
     Reg: y, Value: 4.00 ()
     Reg: .ret, Value: 0.00 ()
     Reg: x, Value: 3.00 ()
     Reg: .link, Value: 0.00 ()
 
-    (((x (PushAndSet (Register x))) (y (PushAndSet (Register y)))
-      (.link (PushAndSet (Add ProgramCounter (Num 1)))))
-     (Jump (conds ()) (default (JumpToLabel function_entrypoint_f))))
     Reg: result, Value: 0.00 ()
     Reg: y, Value: 4.00 (4.00 )
     Reg: .ret, Value: 0.00 ()
     Reg: x, Value: 3.00 (3.00 )
     Reg: .link, Value: 2.00 (0.00 )
 
-    (((.ret (Set (Add (Register x) (Register y))))) NextInstr)
     Reg: result, Value: 0.00 ()
     Reg: y, Value: 4.00 (4.00 )
     Reg: .ret, Value: 7.00 ()
     Reg: x, Value: 3.00 (3.00 )
     Reg: .link, Value: 2.00 (0.00 )
 
-    (((.link Pop)) (Jump (conds ()) (default (JumpToRegister .link))))
     Reg: result, Value: 0.00 ()
     Reg: y, Value: 4.00 (4.00 )
     Reg: .ret, Value: 7.00 ()
     Reg: x, Value: 3.00 (3.00 )
     Reg: .link, Value: 0.00 ()
 
-    (((y Pop) (x Pop)) NextInstr)
     Reg: result, Value: 0.00 ()
     Reg: y, Value: 4.00 ()
     Reg: .ret, Value: 7.00 ()
     Reg: x, Value: 3.00 ()
     Reg: .link, Value: 0.00 ()
 
-    (((result (Set (Register .ret)))) NextInstr)
     Reg: result, Value: 7.00 ()
     Reg: y, Value: 4.00 ()
     Reg: .ret, Value: 7.00 ()
     Reg: x, Value: 3.00 ()
     Reg: .link, Value: 0.00 ()
 
-    (() Exit)
     Reg: result, Value: 7.00 ()
     Reg: y, Value: 4.00 ()
     Reg: .ret, Value: 7.00 ()

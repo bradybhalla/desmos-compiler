@@ -15,6 +15,8 @@ let rec compile_expr : Register_stack_instrs.expr -> Desmos_virtual_machine.expr
   | And (a, b) -> And (compile_expr a, compile_expr b)
   | Or (a, b) -> Or (compile_expr a, compile_expr b)
   | Not e -> Not (compile_expr e)
+  | Mod (a, b) -> Mod (compile_expr a, compile_expr b)
+  | Compare (op, a, b) -> Compare (op, compile_expr a, compile_expr b)
 
 let compile_generalized_set_action = function
   | Register_stack_instrs.Set expr -> Set (compile_expr expr)
@@ -47,15 +49,21 @@ let compile_stmt = function
       Instruction
         ( [ (link_register, Pop) ],
           Jump { conds = []; default = JumpToRegister link_register } )
+  | Exit -> Instruction ([], Desmos_virtual_machine.Exit)
 
-let compile_main prog =
-  List.map ~f:compile_stmt prog @ [ Instruction ([], Exit) ]
+let compile_main prog = List.map ~f:compile_stmt prog
 
 let rec registers_in_expr = function
   | Register r -> Register.Set.singleton r
   | ProgramCounter | Num _ | Bool _ -> Register.Set.empty
-  | Add (a, b) | Sub (a, b) | Mult (a, b) | Div (a, b) | And (a, b) | Or (a, b)
-    ->
+  | Add (a, b)
+  | Sub (a, b)
+  | Mult (a, b)
+  | Div (a, b)
+  | And (a, b)
+  | Or (a, b)
+  | Mod (a, b)
+  | Compare (_, a, b) ->
       Set.union (registers_in_expr a) (registers_in_expr b)
   | Not e -> registers_in_expr e
 
@@ -93,7 +101,6 @@ let extract_registers stmts =
   List.map stmts ~f:registers_in_stmt |> Register.Set.union_list
 
 let compile program =
-  (* TODO brady: need to add an "exit" jump at the end of main *)
   let main = compile_main program in
   let registers = extract_registers main in
   { Desmos_virtual_machine.main; registers }

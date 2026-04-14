@@ -55,10 +55,23 @@ let rec eval_expr expr ~t =
       let b = eval_expr ~t b in
       a +. b -. (a *. b)
   | Not a -> 1. -. eval_expr ~t a
+  | Mod (a, b) -> Float.mod_float (eval_expr ~t a) (eval_expr ~t b)
+  | Compare (op, a, b) ->
+      let a = eval_expr ~t a in
+      let b = eval_expr ~t b in
+      let result =
+        match op with
+        | Compare_op.Eq -> Float.(a = b)
+        | Lt -> Float.(a < b)
+        | Gt -> Float.(a > b)
+        | Ge -> Float.(a >= b)
+        | Le -> Float.(a <= b)
+        | Ne -> Float.(a <> b)
+      in
+      if result then 1. else 0.
 
 let step t =
   let sets, pc_action = Array.get t.instrs t.program_counter in
-  Desmos_virtual_machine.sexp_of_instruction (sets, pc_action) |> print_s;
   (* calculate next program counter *)
   let next_pc =
     match pc_action with
@@ -101,3 +114,8 @@ let step t =
   (* update pc *)
   t.program_counter <- next_pc;
   if t.program_counter < 0 then `Done else `Not_done
+
+let run_until_done (vm_prog : Desmos_virtual_machine.t) =
+  let t = create vm_prog in
+  let rec loop () = match step t with `Done -> t | `Not_done -> loop () in
+  loop ()

@@ -1,0 +1,65 @@
+# Created 2026-04-14 Tue 14:15
+#+title: Desmos compiler
+#+author: Brady Bhalla
+#+filetags: :project:
+
+A [[id:018695B3-B46D-4D51-9C93-CF242FD0A041][compiler]] for the Desmos graphing calculator. This is written in [[id:EBE88C2D-1E24-40E7-8748-835FC4F942E6][OCaml]].
+
+I made a first version of this around sophomore year of college, but I hadn't
+learned about assembly or compilers at all yet so it was pretty bad.
+
+I am working on a new version as part of a [[id:97B0001F-6FB3-47B6-9821-D0E69DC27FDD][CS 81]] project.
+* Overview of intermediate languages (up to date as of 4/14)
+** Register_func_instrs
+The current starting language, which is essentially a register-based instruction
+set that has support for functions. Since Desmos can handle complex instructions
+in each update rule, the instructions in this language can contain full
+expressions (unlike assembly). The different statements are:
+- Set a register to an expression
+- Jump to the label of the first true condition, otherwise to the default label
+- Call a function and possibly put the output in the given register
+- Return an expression from a function
+- Label that can be jumped to
+** Register_stack_instrs
+A register-based instruction set like the previous language, but doesn't have
+direct support for functions anymore. Each register has a stack that its value
+can be pushed/popped from. The statements are
+- GeneralizedSet a list of (register,expression) pairs. All expressions are
+  computed before any register is set, and there is an option to push/pop
+  register values.
+- Link_push_jump will push the next line to the call stack and jump to the
+  label. This is needed to facilitate function returns.
+- Link_pop_jump will pop the line from the call stack and jump to it.
+- Label that can be jumped to
+- Exit the program
+** Desmos_virtual_machine
+The target language of the compiler which can be almost directly translated to
+Desmos after resolving labels. The instructions are all of the form (list of
+generalized sets, pc action).
+- The list of generalized sets is the same as the previous language, where
+  registers are set/pushed/popped.
+- The pc action can be going to the next instruction, conditionally jumping to
+  labels/registers, or exiting the program.
+*** Emulator
+This language has an OCaml emulator so it can be tested without actually needing
+to run things in Desmos. This avoids having to do a lot of annoying browser
+automation.
+** Desmos_output
+Generated Desmos expressions that simulate the virtual machine language. The
+output is JavaScript that can be pasted into the console to insert all necessary
+expressions.
+* Overview of passes (up to date as of 4/14)
+** convert functions to stack
+*Register_func_instrs -> Register_stack_instrs*
+
+Compile function calls and handle register saving with pushing/popping to local
+stacks.
+** explicit program counter
+*Register_stack_instrs -> Desmos_virtual_machine*
+
+Each instruction specifies what should happen to the program counter next
+(continue to the next instruction, exit the program, branch).
+** generate desmos output
+*Desmos_virtual_machine -> Desmos_output*
+
+Generate actual Desmos expressions to simulate the virtual machine.

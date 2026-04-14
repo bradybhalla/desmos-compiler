@@ -16,6 +16,8 @@ module Register_func_instrs = struct
     | And of expr * expr
     | Or of expr * expr
     | Not of expr
+    | Mod of expr * expr
+    | Compare of Compare_op.t * expr * expr
   [@@deriving sexp]
 
   type stmt =
@@ -56,6 +58,8 @@ module Register_stack_instrs = struct
     | And of expr * expr
     | Or of expr * expr
     | Not of expr
+    | Mod of expr * expr
+    | Compare of Compare_op.t * expr * expr
   [@@deriving sexp]
 
   type generalized_set_action = Set of expr | PushAndSet of expr | Push | Pop
@@ -69,6 +73,7 @@ module Register_stack_instrs = struct
     | Link_push_jump of Label.t
       (* call to Link_pop_jump will go to the next line. jump to label *)
     | Link_pop_jump
+    | Exit
   [@@deriving sexp]
 
   type t = stmt list [@@deriving sexp]
@@ -93,6 +98,8 @@ module Desmos_virtual_machine = struct
     | And of expr * expr
     | Or of expr * expr
     | Not of expr
+    | Mod of expr * expr
+    | Compare of Compare_op.t * expr * expr
   [@@deriving sexp]
 
   type generalized_set = Set of expr | PushAndSet of expr | Push | Pop

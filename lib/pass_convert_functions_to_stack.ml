@@ -6,8 +6,14 @@ module Rset = Register.Set
 let rec uncover_register_expr = function
   | Register_func_instrs.Register r -> Rset.singleton r
   | Num _ | Bool _ -> Rset.empty
-  | Add (a, b) | Sub (a, b) | Mult (a, b) | Div (a, b) | And (a, b) | Or (a, b)
-    ->
+  | Add (a, b)
+  | Sub (a, b)
+  | Mult (a, b)
+  | Div (a, b)
+  | And (a, b)
+  | Or (a, b)
+  | Mod (a, b)
+  | Compare (_, a, b) ->
       Set.union (uncover_register_expr a) (uncover_register_expr b)
   | Not e -> uncover_register_expr e
 
@@ -52,6 +58,8 @@ let rec compile_expr = function
   | And (a, b) -> And (compile_expr a, compile_expr b)
   | Or (a, b) -> Or (compile_expr a, compile_expr b)
   | Not e -> Not (compile_expr e)
+  | Mod (a, b) -> Mod (compile_expr a, compile_expr b)
+  | Compare (op, a, b) -> Compare (op, compile_expr a, compile_expr b)
 
 let get_function_label name =
   let function_str = name |> Function_name.to_string in
@@ -144,6 +152,7 @@ let compile_main ~functions ~main =
     main |> List.map ~f:uncover_registers_stmt |> Rset.union_list |> Set.to_list
   in
   List.concat_map ~f:(compile_stmt ~live_registers ~functions) main
+  @ [ Register_stack_instrs.Exit ]
 
 let compile { Register_func_instrs.functions; main } =
   (* need to put main first because the program starts at the beginning *)
