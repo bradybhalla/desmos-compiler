@@ -105,6 +105,7 @@ module Desmos_virtual_machine = struct
   type pc_action =
     | NextInstr
     | Jump of { conds : (expr * jump_target) list; default : jump_target }
+    | Exit
   [@@deriving sexp]
 
   type instruction = (Register.t * generalized_set) list * pc_action

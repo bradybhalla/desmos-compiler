@@ -43,6 +43,7 @@ let%expect_test "compile arithmetic program to desmos vm" =
         (((.ret (Set (Mult (Register x) (Mult (Register y) (Register z))))))
          NextInstr))
        (Instruction
-        (((.link Pop)) (Jump (conds ()) (default (JumpToRegister .link)))))))
+        (((.link Pop)) (Jump (conds ()) (default (JumpToRegister .link)))))
+       (Instruction (() Exit))))
      (registers (.link .ret w x y z)))
     |}]

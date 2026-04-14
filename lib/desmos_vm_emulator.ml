@@ -72,8 +72,9 @@ let step t =
         match target with
         | JumpToLabel lbl -> Map.find_exn t.label_line_lookup lbl
         | JumpToRegister reg ->
-            (* TODO brady: should probably have type safe ints/floats in the future, this is more like how desmos dose it but I want compiler guarantees I won't be jumping to line 13.5 *)
+            (* TODO brady: should probably have type safe ints/floats in the future, this is more like how desmos does it but I want compiler guarantees I won't be jumping to line 13.5 *)
             Hashtbl.find_exn t.registers reg |> round |> int_of_float)
+    | Exit -> -1
   in
   (* compute all expressions using the old values *)
   let values_to_set =
@@ -99,4 +100,4 @@ let step t =
       Hashtbl.set t.registers ~key:reg ~data:value);
   (* update pc *)
   t.program_counter <- next_pc;
-  if t.program_counter > Array.length t.instrs then `Done else `Not_done
+  if t.program_counter < 0 then `Done else `Not_done

@@ -48,7 +48,8 @@ let compile_stmt = function
         ( [ (link_register, Pop) ],
           Jump { conds = []; default = JumpToRegister link_register } )
 
-let compile_main = List.map ~f:compile_stmt
+let compile_main prog =
+  List.map ~f:compile_stmt prog @ [ Instruction ([], Exit) ]
 
 let rec registers_in_expr = function
   | Register r -> Register.Set.singleton r
@@ -71,6 +72,7 @@ let registers_in_pc_action = function
         |> Register.Set.union_list
       in
       Set.union cond_regs (registers_in_jump_target default)
+  | Exit -> Register.Set.empty
 
 let registers_in_stmt = function
   | Label _ -> Register.Set.empty
@@ -91,6 +93,7 @@ let extract_registers stmts =
   List.map stmts ~f:registers_in_stmt |> Register.Set.union_list
 
 let compile program =
+  (* TODO brady: need to add an "exit" jump at the end of main *)
   let main = compile_main program in
   let registers = extract_registers main in
   { Desmos_virtual_machine.main; registers }
