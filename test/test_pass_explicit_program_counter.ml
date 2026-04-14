@@ -33,7 +33,9 @@ let%expect_test "check that registers get extracted correctly" =
       Exit;
       Label f_label;
       GeneralizedSet
-        [ (a, PushAndSet (Register a)); (b, PushAndSet (Register b)); (c, Push) ];
+        [
+          (a, PushAndSet (Register a)); (b, PushAndSet (Register b)); (c, Push);
+        ];
       Link_push_jump g_label;
       GeneralizedSet [ (a, Pop); (b, Pop); (c, Pop) ];
       GeneralizedSet [ (c, Set (Register ret)) ];
@@ -41,7 +43,9 @@ let%expect_test "check that registers get extracted correctly" =
       Link_pop_jump;
       Label g_label;
       GeneralizedSet
-        [ (a, PushAndSet (Register a)); (b, PushAndSet (Register b)); (d, Push) ];
+        [
+          (a, PushAndSet (Register a)); (b, PushAndSet (Register b)); (d, Push);
+        ];
       Link_push_jump f_label;
       GeneralizedSet [ (a, Pop); (b, Pop); (d, Pop) ];
       GeneralizedSet [ (d, Set (Register ret)) ];
@@ -52,4 +56,40 @@ let%expect_test "check that registers get extracted correctly" =
   prog |> Pass_explicit_program_counter.compile
   |> Desmos_virtual_machine.sexp_of_t |> print_s;
   [%expect {|
+    ((main
+      ((Instruction (((c (Set (Num 1)))) NextInstr))
+       (Instruction (((d (Set (Num 2)))) NextInstr))
+       (Instruction
+        (((a (Set (Register c))) (b (Set (Num 1))) (c Push) (d Push) (x Push))
+         NextInstr))
+       (Instruction
+        (((.link (PushAndSet (Add ProgramCounter (Num 1)))))
+         (Jump (conds ()) (default (JumpToLabel function_entrypoint_f)))))
+       (Instruction (((c Pop) (d Pop) (x Pop)) NextInstr))
+       (Instruction (((x (Set (Register .ret)))) NextInstr))
+       (Instruction (() Exit)) (Label function_entrypoint_f)
+       (Instruction
+        (((a (PushAndSet (Register a))) (b (PushAndSet (Register b))) (c Push))
+         NextInstr))
+       (Instruction
+        (((.link (PushAndSet (Add ProgramCounter (Num 1)))))
+         (Jump (conds ()) (default (JumpToLabel function_entrypoint_g)))))
+       (Instruction (((a Pop) (b Pop) (c Pop)) NextInstr))
+       (Instruction (((c (Set (Register .ret)))) NextInstr))
+       (Instruction (((.ret (Set (Register c)))) NextInstr))
+       (Instruction
+        (((.link Pop)) (Jump (conds ()) (default (JumpToRegister .link)))))
+       (Label function_entrypoint_g)
+       (Instruction
+        (((a (PushAndSet (Register a))) (b (PushAndSet (Register b))) (d Push))
+         NextInstr))
+       (Instruction
+        (((.link (PushAndSet (Add ProgramCounter (Num 1)))))
+         (Jump (conds ()) (default (JumpToLabel function_entrypoint_f)))))
+       (Instruction (((a Pop) (b Pop) (d Pop)) NextInstr))
+       (Instruction (((d (Set (Register .ret)))) NextInstr))
+       (Instruction (((.ret (Set (Register d)))) NextInstr))
+       (Instruction
+        (((.link Pop)) (Jump (conds ()) (default (JumpToRegister .link)))))))
+     (registers (.link .ret a b c d x)))
     |}]
