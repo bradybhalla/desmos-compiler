@@ -63,7 +63,7 @@ let%expect_test "check that registers get extracted correctly" =
         (((a (Set (Register c))) (b (Set (Num 1))) (c Push) (d Push) (x Push))
          NextInstr))
        (Instruction
-        (((.link (PushAndSet (Add ProgramCounter (Num 1)))))
+        (((00link (PushAndSet (Add ProgramCounter (Num 1)))))
          (Jump (conds ()) (default (JumpToLabel function_entrypoint_f)))))
        (Instruction (((c Pop) (d Pop) (x Pop)) NextInstr))
        (Instruction (((x (Set (Register .ret)))) NextInstr))
@@ -72,24 +72,24 @@ let%expect_test "check that registers get extracted correctly" =
         (((a (PushAndSet (Register a))) (b (PushAndSet (Register b))) (c Push))
          NextInstr))
        (Instruction
-        (((.link (PushAndSet (Add ProgramCounter (Num 1)))))
+        (((00link (PushAndSet (Add ProgramCounter (Num 1)))))
          (Jump (conds ()) (default (JumpToLabel function_entrypoint_g)))))
        (Instruction (((a Pop) (b Pop) (c Pop)) NextInstr))
        (Instruction (((c (Set (Register .ret)))) NextInstr))
        (Instruction (((.ret (Set (Register c)))) NextInstr))
        (Instruction
-        (((.link Pop)) (Jump (conds ()) (default (JumpToRegister .link)))))
+        (((00link Pop)) (Jump (conds ()) (default (JumpToRegister 00link)))))
        (Label function_entrypoint_g)
        (Instruction
         (((a (PushAndSet (Register a))) (b (PushAndSet (Register b))) (d Push))
          NextInstr))
        (Instruction
-        (((.link (PushAndSet (Add ProgramCounter (Num 1)))))
+        (((00link (PushAndSet (Add ProgramCounter (Num 1)))))
          (Jump (conds ()) (default (JumpToLabel function_entrypoint_f)))))
        (Instruction (((a Pop) (b Pop) (d Pop)) NextInstr))
        (Instruction (((d (Set (Register .ret)))) NextInstr))
        (Instruction (((.ret (Set (Register d)))) NextInstr))
        (Instruction
-        (((.link Pop)) (Jump (conds ()) (default (JumpToRegister .link)))))))
-     (registers (.link .ret a b c d x)))
+        (((00link Pop)) (Jump (conds ()) (default (JumpToRegister 00link)))))))
+     (registers (.ret 00link a b c d x)))
     |}]

@@ -51,11 +51,11 @@ let%expect_test "test register saving in functions" =
        (b Push) (x Push)))
      (Link_push_jump function_entrypoint_f)
      (GeneralizedSet ((a Pop) (b Pop) (x Pop) (y Pop) (z Pop)))
-     (GeneralizedSet ((a (Set (Register .ret)))))
+     (GeneralizedSet ((a (Set (Register 00ret)))))
      (GeneralizedSet ((b (Set (Num 99))))) Exit (Label function_entrypoint_f)
      (GeneralizedSet ((a (Set (Add (Register y) (Register z))))))
      (GeneralizedSet ((b (Set (Mult (Register a) (Register z))))))
-     (GeneralizedSet ((.ret (Set (Register b))))) Link_pop_jump)
+     (GeneralizedSet ((00ret (Set (Register b))))) Link_pop_jump)
     |}]
 
 let%expect_test "test mutual recursive functions" =
@@ -119,19 +119,19 @@ let%expect_test "test mutual recursive functions" =
       ((a (Set (Register c))) (b (Set (Num 1))) (c Push) (d Push) (x Push)))
      (Link_push_jump function_entrypoint_f)
      (GeneralizedSet ((c Pop) (d Pop) (x Pop)))
-     (GeneralizedSet ((x (Set (Register .ret))))) Exit
+     (GeneralizedSet ((x (Set (Register 00ret))))) Exit
      (Label function_entrypoint_f)
      (GeneralizedSet
       ((a (PushAndSet (Register a))) (b (PushAndSet (Register b))) (c Push)))
      (Link_push_jump function_entrypoint_g)
      (GeneralizedSet ((a Pop) (b Pop) (c Pop)))
-     (GeneralizedSet ((c (Set (Register .ret)))))
-     (GeneralizedSet ((.ret (Set (Register c))))) Link_pop_jump
+     (GeneralizedSet ((c (Set (Register 00ret)))))
+     (GeneralizedSet ((00ret (Set (Register c))))) Link_pop_jump
      (Label function_entrypoint_g)
      (GeneralizedSet
       ((a (PushAndSet (Register a))) (b (PushAndSet (Register b))) (d Push)))
      (Link_push_jump function_entrypoint_f)
      (GeneralizedSet ((a Pop) (b Pop) (d Pop)))
-     (GeneralizedSet ((d (Set (Register .ret)))))
-     (GeneralizedSet ((.ret (Set (Register d))))) Link_pop_jump)
+     (GeneralizedSet ((d (Set (Register 00ret)))))
+     (GeneralizedSet ((00ret (Set (Register d))))) Link_pop_jump)
     |}]

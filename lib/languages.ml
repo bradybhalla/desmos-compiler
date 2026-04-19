@@ -45,7 +45,7 @@ module Register_func_instrs_with_liveness = struct end
     functions). *)
 module Register_stack_instrs = struct
   (* TODO brady: maybe make this per-function? *)
-  let return_register = Register.of_string ".ret"
+  let return_register = Register.of_string "00ret"
 
   type expr =
     | Register of Register.t
@@ -84,7 +84,7 @@ end
     once, and reads of the register will be from before the modification. The
     program counter update is also explicit in this instruction set. *)
 module Desmos_virtual_machine = struct
-  let link_register = Register.of_string ".link"
+  let link_register = Register.of_string "00link"
 
   type expr =
     | Register of Register.t
@@ -126,7 +126,7 @@ end
 (** The output to desmos, including the runtime environment necessary to execute
     the program. *)
 module Desmos_output = struct
-  let program_counter_reg = Register.of_string "pc"
+  let program_counter_reg = Register.of_string "00pc"
 
   type expr =
     | Register of Register.t
@@ -143,9 +143,12 @@ module Desmos_output = struct
     | ListJoin of expr * expr
     | ListSlice of expr * expr * expr
     | ListLength of expr
+    | ListIndex of expr * expr
+    | If_expr of { conds : (condition * expr) list; default : expr }
+    | ListLiteral of expr list
   [@@deriving sexp]
 
-  type condition = Compare of Compare_op.t * expr * expr | BoolVal of expr
+  and condition = Compare of Compare_op.t * expr * expr | BoolVal of expr
   [@@deriving sexp]
 
   type set = Register.t * expr [@@deriving sexp]
@@ -201,20 +204,24 @@ module Desmos_output = struct
         latex_of_expr lst
         ^ latex_wrap_lr "[" "]"
             (latex_of_expr istart ^ " ... " ^ latex_of_expr iend)
+    | ListIndex (lst, i) ->
+        latex_of_expr lst ^ latex_wrap_lr "[" "]" (latex_of_expr i)
     | ListLength lst -> latex_unary_operator "length" lst
+    | ListLiteral exprs ->
+        List.map exprs ~f:latex_of_expr
+        |> String.concat ~sep:", " |> latex_wrap_lr "[" "]"
+    | If_expr { conds; default } -> (
+        match conds with
+        | [] -> latex_of_expr default
+        | conds ->
+            let conds_latex =
+              List.map conds ~f:(fun (cond, value) ->
+                  latex_of_cond cond ^ ": " ^ latex_of_expr value)
+            in
+            String.concat ~sep:", " conds_latex ^ ", " ^ latex_of_expr default
+            |> latex_wrap_lr "\\{" "\\}")
 
-  let latex_of_set (reg, expr) =
-    latex_of_register reg ^ "\\to " ^ latex_of_expr expr
-
-  let latex_of_set_list sets =
-    match sets with
-    | [] -> failwith "should not have empty set list"
-    | [ set ] -> latex_of_set set
-    | sets ->
-        sets |> List.map ~f:latex_of_set |> String.concat ~sep:", "
-        |> latex_wrap_lr "(" ")"
-
-  let rec latex_of_cond = function
+  and latex_of_cond = function
     | Compare (op, a, b) -> (
         let a_latex = latex_of_expr a in
         let b_latex = latex_of_expr b in
@@ -228,6 +235,17 @@ module Desmos_output = struct
         | Le -> a_latex ^ " \\le " ^ b_latex)
     (* booleans are either 1 or 0 *)
     | BoolVal v -> latex_of_cond (Compare (Eq, v, Num 1.))
+
+  let latex_of_set (reg, expr) =
+    latex_of_register reg ^ "\\to " ^ latex_of_expr expr
+
+  let latex_of_set_list sets =
+    match sets with
+    | [] -> failwith "should not have empty set list"
+    | [ set ] -> latex_of_set set
+    | sets ->
+        sets |> List.map ~f:latex_of_set |> String.concat ~sep:", "
+        |> latex_wrap_lr "(" ")"
 
   let latex_of_action { conds; default } =
     match conds with
@@ -251,7 +269,7 @@ module Desmos_output = struct
           let escaped =
             String.substr_replace_all ~pattern:"\\" ~with_:"\\\\" str
           in
-          "{latex: " ^ escaped ^ "}")
+          "{latex: \"" ^ escaped ^ "\"}")
     in
-    "Calc.set_Expressions([" ^ String.concat ~sep:", " json_equations ^ "])"
+    "Calc.setExpressions([" ^ String.concat ~sep:", " json_equations ^ "])"
 end

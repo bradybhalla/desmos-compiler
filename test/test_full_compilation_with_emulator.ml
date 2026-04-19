@@ -14,7 +14,7 @@ let print_register t register_name =
 
 let prog_fib input_n =
   let open Register_func_instrs in
-  let fib_tail = Function_name.of_string "fib_tail" in
+  let fib = Function_name.of_string "fib" in
   let n = Register.of_string "n" in
   let a = Register.of_string "a" in
   let b = Register.of_string "b" in
@@ -25,7 +25,7 @@ let prog_fib input_n =
     functions =
       Function_name.Map.of_alist_exn
         [
-          ( fib_tail,
+          ( fib,
             {
               params = [ n; a; b ];
               body =
@@ -40,7 +40,7 @@ let prog_fib input_n =
                   Label recurse_label;
                   Call
                     {
-                      func_name = fib_tail;
+                      func_name = fib;
                       args =
                         [
                           Sub (Register n, Num 1.);
@@ -57,7 +57,7 @@ let prog_fib input_n =
       [
         Call
           {
-            func_name = fib_tail;
+            func_name = fib;
             args = [ Num (float_of_int input_n); Num 0.; Num 1. ];
             ret = Some result;
           };
