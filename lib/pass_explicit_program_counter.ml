@@ -37,7 +37,6 @@ let compile_stmt = function
             (compile_expr expr, JumpToLabel lbl))
       in
       Instruction ([], Jump { conds; default = JumpToLabel default })
-  | Label lbl -> Label lbl
   | Link_push_jump lbl ->
       (* TODO brady: If we made this push a label instead then we could jump
        to something like (link_register, PushAndSet (LabelVal lbl)). maybe
@@ -51,7 +50,10 @@ let compile_stmt = function
           Jump { conds = []; default = JumpToRegister link_register } )
   | Exit -> Instruction ([], Desmos_virtual_machine.Exit)
 
-let compile_main prog = List.map ~f:compile_stmt prog
+let compile_main (blocks : Register_stack_instrs.block list) =
+  List.concat_map blocks ~f:(fun block ->
+    Desmos_virtual_machine.Label block.label
+    :: List.map block.body ~f:compile_stmt)
 
 let rec registers_in_expr = function
   | Register r -> Register.Set.singleton r

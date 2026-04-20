@@ -28,39 +28,56 @@ let prog_fib input_n =
           ( fib,
             {
               params = [ n; a; b ];
-              body =
+              blocks =
                 [
-                  Jump
-                    {
-                      conds = [ (Compare (Eq, Register n, Num 0.), base_label) ];
-                      default = recurse_label;
-                    };
-                  Label base_label;
-                  Return (Register a);
-                  Label recurse_label;
-                  Call
-                    {
-                      func_name = fib;
-                      args =
-                        [
-                          Sub (Register n, Num 1.);
-                          Register b;
-                          Add (Register a, Register b);
-                        ];
-                      ret = Some result;
-                    };
-                  Return (Register result);
+                  {
+                    label = entry_label;
+                    body =
+                      [
+                        Jump
+                          {
+                            conds =
+                              [ (Compare (Eq, Register n, Num 0.), base_label) ];
+                            default = recurse_label;
+                          };
+                      ];
+                  };
+                  { label = base_label; body = [ Return (Register a) ] };
+                  {
+                    label = recurse_label;
+                    body =
+                      [
+                        Call
+                          {
+                            func_name = fib;
+                            args =
+                              [
+                                Sub (Register n, Num 1.);
+                                Register b;
+                                Add (Register a, Register b);
+                              ];
+                            ret = Some result;
+                          };
+                        Return (Register result);
+                      ];
+                  };
                 ];
             } );
         ];
     main =
       [
-        Call
-          {
-            func_name = fib;
-            args = [ Num (float_of_int input_n); Num 0.; Num 1. ];
-            ret = Some result;
-          };
+        {
+          label = entry_label;
+          body =
+            [
+              Call
+                {
+                  func_name = fib;
+                  args = [ Num (float_of_int input_n); Num 0.; Num 1. ];
+                  ret = Some result;
+                };
+            ];
+        };
       ];
   }
 
@@ -80,35 +97,57 @@ let prog_gcd input_a input_b =
           ( gcd,
             {
               params = [ a; b ];
-              body =
+              blocks =
                 [
-                  Jump
-                    {
-                      conds = [ (Compare (Eq, Register b, Num 0.), base_label) ];
-                      default = recurse_label;
-                    };
-                  Label base_label;
-                  Return (Register a);
-                  Label recurse_label;
-                  Set (r, Mod (Register a, Register b));
-                  Call
-                    {
-                      func_name = gcd;
-                      args = [ Register b; Register r ];
-                      ret = Some result;
-                    };
-                  Return (Register result);
+                  {
+                    label = entry_label;
+                    body =
+                      [
+                        Jump
+                          {
+                            conds =
+                              [
+                                (Compare (Eq, Register b, Num 0.), base_label);
+                              ];
+                            default = recurse_label;
+                          };
+                      ];
+                  };
+                  { label = base_label; body = [ Return (Register a) ] };
+                  {
+                    label = recurse_label;
+                    body =
+                      [
+                        Set (r, Mod (Register a, Register b));
+                        Call
+                          {
+                            func_name = gcd;
+                            args = [ Register b; Register r ];
+                            ret = Some result;
+                          };
+                        Return (Register result);
+                      ];
+                  };
                 ];
             } );
         ];
     main =
       [
-        Call
-          {
-            func_name = gcd;
-            args = [ Num (float_of_int input_a); Num (float_of_int input_b) ];
-            ret = Some result;
-          };
+        {
+          label = entry_label;
+          body =
+            [
+              Call
+                {
+                  func_name = gcd;
+                  args =
+                    [
+                      Num (float_of_int input_a); Num (float_of_int input_b);
+                    ];
+                  ret = Some result;
+                };
+            ];
+        };
       ];
   }
 

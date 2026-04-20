@@ -5,6 +5,8 @@ open Types
     need to worry about saving registers when calling/returning from functions.
 *)
 module Register_func_instrs = struct
+  let entry_label = Label.of_string ".main"
+
   type expr =
     | Register of Register.t
     | Num of float
@@ -29,13 +31,14 @@ module Register_func_instrs = struct
         ret : Register.t option;
       }
     | Return of expr
-    | Label of Label.t
   [@@deriving sexp]
 
-  type function_def = { params : Register.t list; body : stmt list }
+  type block = { label : Label.t; body : stmt list } [@@deriving sexp]
+
+  type function_def = { params : Register.t list; blocks : block list }
   [@@deriving sexp]
 
-  type t = { functions : function_def Function_name.Map.t; main : stmt list }
+  type t = { functions : function_def Function_name.Map.t; main : block list }
   [@@deriving sexp]
 end
 
@@ -46,6 +49,7 @@ module Register_func_instrs_with_liveness = struct end
 module Register_stack_instrs = struct
   (* TODO brady: maybe make this per-function? *)
   let return_register = Register.of_string "00ret"
+  let entry_label = Label.of_string ".main"
 
   type expr =
     | Register of Register.t
@@ -67,7 +71,6 @@ module Register_stack_instrs = struct
 
   type stmt =
     | Jump of { conds : (expr * Label.t) list; default : Label.t }
-    | Label of Label.t
     | GeneralizedSet of (Register.t * generalized_set_action) list
       (* push old values to the stack, and set new values using expression computed with the old values  *)
     | Link_push_jump of Label.t
@@ -76,7 +79,8 @@ module Register_stack_instrs = struct
     | Exit
   [@@deriving sexp]
 
-  type t = stmt list [@@deriving sexp]
+  type block = { label : Label.t; body : stmt list } [@@deriving sexp]
+  type t = block list [@@deriving sexp]
 end
 
 (** Register-based instruction set that allows for calling any number of

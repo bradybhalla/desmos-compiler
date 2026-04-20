@@ -36,12 +36,12 @@ let uncover_registers_stmt = function
       in
       Set.union args_regs ret_regs
   | Return expr -> uncover_register_expr expr
-  | Label _ -> Rset.empty
 
 let uncover_registers_func (def : Register_func_instrs.function_def) =
   let params_regs = Rset.of_list def.params in
   let body_regs =
-    def.body
+    def.blocks
+    |> List.concat_map ~f:(fun b -> b.Register_func_instrs.body)
     |> List.map ~f:uncover_registers_stmt
     |> List.fold ~f:Set.union ~init:Rset.empty
   in
@@ -83,7 +83,6 @@ let compile_stmt ~live_registers
             default;
           };
       ]
-  | Label l -> [ Label l ]
   | Call call_info ->
       let open Register_stack_instrs in
       (* TODO brady: get liveness from prev language *)
@@ -141,18 +140,28 @@ let compile_stmt ~live_registers
 
 let compile_function_def ~functions (name, def) =
   let live_registers = uncover_registers_func def |> Set.to_list in
-  let entrypoint_label =
-    Register_stack_instrs.Label (get_function_label name)
-  in
-  entrypoint_label
-  :: List.concat_map ~f:(compile_stmt ~live_registers ~functions) def.body
+  List.mapi def.blocks ~f:(fun i block ->
+    let label = if i = 0 then get_function_label name else block.Register_func_instrs.label in
+    { Register_stack_instrs.label;
+      body = List.concat_map block.body ~f:(compile_stmt ~live_registers ~functions) })
 
 let compile_main ~functions ~main =
   let live_registers =
-    main |> List.map ~f:uncover_registers_stmt |> Rset.union_list |> Set.to_list
+    main
+    |> List.concat_map ~f:(fun b -> b.Register_func_instrs.body)
+    |> List.map ~f:uncover_registers_stmt
+    |> Rset.union_list |> Set.to_list
   in
-  List.concat_map ~f:(compile_stmt ~live_registers ~functions) main
-  @ [ Register_stack_instrs.Exit ]
+  let compiled =
+    List.map main ~f:(fun block ->
+      { Register_stack_instrs.label = block.Register_func_instrs.label;
+        body = List.concat_map block.body ~f:(compile_stmt ~live_registers ~functions) })
+  in
+  match List.rev compiled with
+  | [] -> []
+  | last :: rest_rev ->
+      List.rev rest_rev
+      @ [ { last with body = last.body @ [ Register_stack_instrs.Exit ] } ]
 
 let compile { Register_func_instrs.functions; main } =
   (* need to put main first because the program starts at the beginning *)

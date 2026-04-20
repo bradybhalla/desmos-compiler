@@ -19,22 +19,34 @@ let%expect_test "test register saving in functions" =
             ( f,
               {
                 params = [ y; z ];
-                body =
+                blocks =
                   [
-                    Set (a, Add (Register y, Register z));
-                    Set (b, Mult (Register a, Register z));
-                    Return (Register b);
+                    {
+                      label = entry_label;
+                      body =
+                        [
+                          Set (a, Add (Register y, Register z));
+                          Set (b, Mult (Register a, Register z));
+                          Return (Register b);
+                        ];
+                    };
                   ];
               } );
           ];
       main =
         [
-          Set (x, Num 5.);
-          Set (y, Num 3.);
-          Set (z, Num 2.);
-          Call
-            { func_name = f; args = [ Register y; Register x ]; ret = Some a };
-          Set (b, Num 99.);
+          {
+            label = entry_label;
+            body =
+              [
+                Set (x, Num 5.);
+                Set (y, Num 3.);
+                Set (z, Num 2.);
+                Call
+                  { func_name = f; args = [ Register y; Register x ]; ret = Some a };
+                Set (b, Num 99.);
+              ];
+          };
         ];
     }
   in
@@ -44,18 +56,22 @@ let%expect_test "test register saving in functions" =
   (* then they should all be Pop afterwards *)
   [%expect
     {|
-    ((GeneralizedSet ((x (Set (Num 5))))) (GeneralizedSet ((y (Set (Num 3)))))
-     (GeneralizedSet ((z (Set (Num 2)))))
-     (GeneralizedSet
-      ((y (PushAndSet (Register y))) (z (PushAndSet (Register x))) (a Push)
-       (b Push) (x Push)))
-     (Link_push_jump function_entrypoint_f)
-     (GeneralizedSet ((a Pop) (b Pop) (x Pop) (y Pop) (z Pop)))
-     (GeneralizedSet ((a (Set (Register 00ret)))))
-     (GeneralizedSet ((b (Set (Num 99))))) Exit (Label function_entrypoint_f)
-     (GeneralizedSet ((a (Set (Add (Register y) (Register z))))))
-     (GeneralizedSet ((b (Set (Mult (Register a) (Register z))))))
-     (GeneralizedSet ((00ret (Set (Register b))))) Link_pop_jump)
+    (((label .main)
+      (body
+       ((GeneralizedSet ((x (Set (Num 5))))) (GeneralizedSet ((y (Set (Num 3)))))
+        (GeneralizedSet ((z (Set (Num 2)))))
+        (GeneralizedSet
+         ((y (PushAndSet (Register y))) (z (PushAndSet (Register x))) (a Push)
+          (b Push) (x Push)))
+        (Link_push_jump function_entrypoint_f)
+        (GeneralizedSet ((a Pop) (b Pop) (x Pop) (y Pop) (z Pop)))
+        (GeneralizedSet ((a (Set (Register 00ret)))))
+        (GeneralizedSet ((b (Set (Num 99))))) Exit)))
+     ((label function_entrypoint_f)
+      (body
+       ((GeneralizedSet ((a (Set (Add (Register y) (Register z))))))
+        (GeneralizedSet ((b (Set (Mult (Register a) (Register z))))))
+        (GeneralizedSet ((00ret (Set (Register b))))) Link_pop_jump))))
     |}]
 
 let%expect_test "test mutual recursive functions" =
@@ -75,37 +91,55 @@ let%expect_test "test mutual recursive functions" =
             ( f,
               {
                 params = [ a; b ];
-                body =
+                blocks =
                   [
-                    Call
-                      {
-                        func_name = g;
-                        args = [ Register a; Register b ];
-                        ret = Some c;
-                      };
-                    Return (Register c);
+                    {
+                      label = entry_label;
+                      body =
+                        [
+                          Call
+                            {
+                              func_name = g;
+                              args = [ Register a; Register b ];
+                              ret = Some c;
+                            };
+                          Return (Register c);
+                        ];
+                    };
                   ];
               } );
             ( g,
               {
                 params = [ a; b ];
-                body =
+                blocks =
                   [
-                    Call
-                      {
-                        func_name = f;
-                        args = [ Register a; Register b ];
-                        ret = Some d;
-                      };
-                    Return (Register d);
+                    {
+                      label = entry_label;
+                      body =
+                        [
+                          Call
+                            {
+                              func_name = f;
+                              args = [ Register a; Register b ];
+                              ret = Some d;
+                            };
+                          Return (Register d);
+                        ];
+                    };
                   ];
               } );
           ];
       main =
         [
-          Set (c, Num 1.);
-          Set (d, Num 2.);
-          Call { func_name = f; args = [ Register c; Num 1. ]; ret = Some x };
+          {
+            label = entry_label;
+            body =
+              [
+                Set (c, Num 1.);
+                Set (d, Num 2.);
+                Call { func_name = f; args = [ Register c; Num 1. ]; ret = Some x };
+              ];
+          };
         ];
     }
   in
@@ -114,24 +148,28 @@ let%expect_test "test mutual recursive functions" =
   (* the call to f from main should save d even though it is not used directly in f *)
   [%expect
     {|
-    ((GeneralizedSet ((c (Set (Num 1))))) (GeneralizedSet ((d (Set (Num 2)))))
-     (GeneralizedSet
-      ((a (Set (Register c))) (b (Set (Num 1))) (c Push) (d Push) (x Push)))
-     (Link_push_jump function_entrypoint_f)
-     (GeneralizedSet ((c Pop) (d Pop) (x Pop)))
-     (GeneralizedSet ((x (Set (Register 00ret))))) Exit
-     (Label function_entrypoint_f)
-     (GeneralizedSet
-      ((a (PushAndSet (Register a))) (b (PushAndSet (Register b))) (c Push)))
-     (Link_push_jump function_entrypoint_g)
-     (GeneralizedSet ((a Pop) (b Pop) (c Pop)))
-     (GeneralizedSet ((c (Set (Register 00ret)))))
-     (GeneralizedSet ((00ret (Set (Register c))))) Link_pop_jump
-     (Label function_entrypoint_g)
-     (GeneralizedSet
-      ((a (PushAndSet (Register a))) (b (PushAndSet (Register b))) (d Push)))
-     (Link_push_jump function_entrypoint_f)
-     (GeneralizedSet ((a Pop) (b Pop) (d Pop)))
-     (GeneralizedSet ((d (Set (Register 00ret)))))
-     (GeneralizedSet ((00ret (Set (Register d))))) Link_pop_jump)
+    (((label .main)
+      (body
+       ((GeneralizedSet ((c (Set (Num 1))))) (GeneralizedSet ((d (Set (Num 2)))))
+        (GeneralizedSet
+         ((a (Set (Register c))) (b (Set (Num 1))) (c Push) (d Push) (x Push)))
+        (Link_push_jump function_entrypoint_f)
+        (GeneralizedSet ((c Pop) (d Pop) (x Pop)))
+        (GeneralizedSet ((x (Set (Register 00ret))))) Exit)))
+     ((label function_entrypoint_f)
+      (body
+       ((GeneralizedSet
+         ((a (PushAndSet (Register a))) (b (PushAndSet (Register b))) (c Push)))
+        (Link_push_jump function_entrypoint_g)
+        (GeneralizedSet ((a Pop) (b Pop) (c Pop)))
+        (GeneralizedSet ((c (Set (Register 00ret)))))
+        (GeneralizedSet ((00ret (Set (Register c))))) Link_pop_jump)))
+     ((label function_entrypoint_g)
+      (body
+       ((GeneralizedSet
+         ((a (PushAndSet (Register a))) (b (PushAndSet (Register b))) (d Push)))
+        (Link_push_jump function_entrypoint_f)
+        (GeneralizedSet ((a Pop) (b Pop) (d Pop)))
+        (GeneralizedSet ((d (Set (Register 00ret)))))
+        (GeneralizedSet ((00ret (Set (Register d))))) Link_pop_jump))))
     |}]
