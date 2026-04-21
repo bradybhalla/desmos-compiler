@@ -31,7 +31,7 @@ and registers_in_condition = function
   | BoolVal e -> registers_in_expr e
 
 let registers_in_stmt = function
-  | Label _ | Exit -> Register.Set.empty
+  | Exit -> Register.Set.empty
   | Instruction sets ->
       List.map sets ~f:(fun (reg, action) ->
           let expr_regs =
@@ -42,9 +42,12 @@ let registers_in_stmt = function
           Set.add expr_regs reg)
       |> Register.Set.union_list
 
-let compile (program : unit Desmos_virtual_machine.t) :
-    Register.Set.t Desmos_virtual_machine.t =
+let compile program =
   let registers =
-    List.map program.main ~f:registers_in_stmt |> Register.Set.union_list
+    List.concat_map program.main ~f:(fun block ->
+        List.map block.body ~f:registers_in_stmt)
+    |> Register.Set.union_list
+    |> Set.to_map ~f:(fun _ -> Num 1.2345)
+    |> Map.set ~key:program_counter_reg ~data:(Num 0.)
   in
   { program with info = registers }

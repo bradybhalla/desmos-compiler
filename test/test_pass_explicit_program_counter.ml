@@ -26,13 +26,14 @@ let%expect_test "normal instructions compile correctly" =
   [%expect
     {|
     ((main
-      ((Label normal_instrs)
-       (Instruction
-        ((00pc (Set (Add (Register 00pc) (Num 1)))) (a (Set (Num 5)))))
-       (Instruction
-        ((00pc (Set (Add (Register 00pc) (Num 1))))
-         (b (Set (Add (Register a) (Num 1))))))
-       Exit))
+      (((label normal_instrs)
+        (body
+         ((Instruction
+           ((00pc (Set (Add (Register 00pc) (Num 1)))) (a (Set (Num 5)))))
+          (Instruction
+           ((00pc (Set (Add (Register 00pc) (Num 1))))
+            (b (Set (Add (Register a) (Num 1))))))
+          Exit)))))
      (info ()))
     |}]
 
@@ -63,14 +64,15 @@ let%expect_test "jump compiles correctly" =
   [%expect
     {|
     ((main
-      ((Label conditional_jump)
-       (Instruction
-        ((00pc
-          (Set
-           (If_expr
-            (conds
-             (((Compare Eq (Register c) (Num 0)) (LabelLineNumber target))))
-            (default (LabelLineNumber default)))))))))
+      (((label conditional_jump)
+        (body
+         ((Instruction
+           ((00pc
+             (Set
+              (If_expr
+               (conds
+                (((Compare Eq (Register c) (Num 0)) (LabelLineNumber target))))
+               (default (LabelLineNumber default))))))))))))
      (info ()))
     |}]
 
@@ -95,13 +97,14 @@ let%expect_test "JumpLink compiles correctly" =
   [%expect
     {|
     ((main
-      ((Label jumplink_test)
-       (Instruction
-        ((00pc (Set (Add (Register 00pc) (Num 1)))) (a (Set (Num 1)))))
-       (Instruction
-        ((00link (Set (Add (Register 00pc) (Num 1))))
-         (00pc (Set (LabelLineNumber func)))))
-       Exit))
+      (((label jumplink_test)
+        (body
+         ((Instruction
+           ((00pc (Set (Add (Register 00pc) (Num 1)))) (a (Set (Num 1)))))
+          (Instruction
+           ((00link (Set (Add (Register 00pc) (Num 1))))
+            (00pc (Set (LabelLineNumber func)))))
+          Exit)))))
      (info ()))
     |}]
 
@@ -122,7 +125,9 @@ let%expect_test "return compiles correctly" =
   [%expect
     {|
     ((main
-      ((Label return_test)
-       (Instruction ((00ret (Set (Register b))) (00pc (Set (Register 00link)))))))
+      (((label return_test)
+        (body
+         ((Instruction
+           ((00ret (Set (Register b))) (00pc (Set (Register 00link))))))))))
      (info ()))
     |}]

@@ -3,9 +3,8 @@ open! Languages
 open! Types
 open Desmos_virtual_machine
 
-let rec compile_expr : Register_stack_instrs.expr -> Desmos_virtual_machine.expr
-    = function
-  | Register r -> Register r
+let rec compile_expr = function
+  | Register_stack_instrs.Register r -> Register r
   | Num n -> Num n
   | Bool b -> Bool b
   | Add (a, b) -> Add (compile_expr a, compile_expr b)
@@ -25,9 +24,7 @@ let rec compile_expr : Register_stack_instrs.expr -> Desmos_virtual_machine.expr
           default = compile_expr default;
         }
 
-and compile_condition :
-    Register_stack_instrs.condition -> Desmos_virtual_machine.condition =
-  function
+and compile_condition = function
   | Compare (op, a, b) -> Compare (op, compile_expr a, compile_expr b)
   | BoolVal e -> BoolVal (compile_expr e)
 
@@ -75,16 +72,10 @@ let compile_control_flow = function
         ]
   | Exit -> Desmos_virtual_machine.Exit
 
-let compile_block block =
-  let label = Desmos_virtual_machine.Label block.Register_stack_instrs.label in
-  let body = List.map block.Register_stack_instrs.body ~f:compile_body_stmt in
-  let control_flow =
-    compile_control_flow block.Register_stack_instrs.control_flow
-  in
-  [ label ] @ body @ [ control_flow ]
+let compile_block (block : Register_stack_instrs.block) =
+  let body = List.map block.body ~f:compile_body_stmt in
+  let control_flow = compile_control_flow block.control_flow in
+  { Desmos_virtual_machine.label = block.label; body = body @ [ control_flow ] }
 
-let compile (blocks : Register_stack_instrs.t) =
-  {
-    Desmos_virtual_machine.main = List.concat_map blocks ~f:compile_block;
-    info = ();
-  }
+let compile blocks =
+  { Desmos_virtual_machine.main = List.map blocks ~f:compile_block; info = () }

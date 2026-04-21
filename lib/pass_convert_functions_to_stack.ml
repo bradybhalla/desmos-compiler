@@ -43,13 +43,12 @@ let compile_control_flow = function
 let compile_stmt
     ~(functions :
        Register_func_instrs_with_call_liveness.function_def Function_name.Map.t)
-    = function
+    =
+  let open Register_stack_instrs in
+  function
   | Register_func_instrs_with_call_liveness.Set (reg, expr) ->
-      [
-        Register_stack_instrs.GeneralizedSet [ (reg, Set (compile_expr expr)) ];
-      ]
+      [ GeneralizedSet [ (reg, Set (compile_expr expr)) ] ]
   | Call { func_name; args; ret; live_registers } ->
-      let open Register_stack_instrs in
       let need_to_save_registers = Rset.of_list live_registers in
       let func_info = Map.find_exn functions func_name in
       let arg_registers = func_info.params in
@@ -91,11 +90,11 @@ let compile_stmt
       [ save_registers_and_set_args; call_function; restore_registers ]
       @ store_result
 
-let compile_function_def ~functions (_name, def) =
-  List.map def.Register_func_instrs_with_call_liveness.blocks ~f:(fun block ->
+let compile_function_def ~functions ((_ : Function_name.t), def) =
+  let open Register_func_instrs_with_call_liveness in
+  List.map def.blocks ~f:(fun block ->
       {
-        Register_stack_instrs.label =
-          block.Register_func_instrs_with_call_liveness.label;
+        Register_stack_instrs.label = block.label;
         body = List.concat_map block.body ~f:(compile_stmt ~functions);
         control_flow = compile_control_flow block.control_flow;
       })

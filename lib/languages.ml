@@ -123,6 +123,9 @@ module Register_stack_instrs = struct
     | GeneralizedSet of (Register.t * generalized_set_action) list
     (* push old values to the stack, and set new values using expression computed with the old values  *)
     (* this is a statement instead of control flow because we know we are coming back. *)
+    (* TODO brady: when doing optimizations, figure out if it actually makes
+       sense to have JumpLink in the middle of a block or to just have it
+       with the other control flow at the end of the block *)
     | JumpLink of Label.t
   [@@deriving sexp]
 
@@ -166,16 +169,19 @@ module Desmos_virtual_machine = struct
   and condition = Compare of Compare_op.t * expr * expr | BoolVal of expr
   [@@deriving sexp]
 
-  type generalized_set = Set of expr | PushAndSet of expr | Push | Pop
+  type generalized_set_action = Set of expr | PushAndSet of expr | Push | Pop
   [@@deriving sexp]
 
-  type stmt =
-    | Instruction of (Register.t * generalized_set) list
-    | Label of Label.t
-    | Exit
+  (* TODO brady: for optimizations it might be kind of hard to determine if
+    two instructions can be combined (we need to search for pc -> pc+1).
+    maybe we need another intermediate language where there are Instructions
+    and ManualPCInstructions? Then we optimize there and have a small pass
+    turning it into this language? *)
+  type stmt = Instruction of (Register.t * generalized_set_action) list | Exit
   [@@deriving sexp]
 
-  type 'a t = { main : stmt list; info : 'a } [@@deriving sexp]
+  type block = { label : Label.t; body : stmt list } [@@deriving sexp]
+  type 'a t = { main : block list; info : 'a } [@@deriving sexp]
 end
 
 (** The output to desmos, including the runtime environment necessary to execute
@@ -218,7 +224,9 @@ module Desmos_output = struct
 
   let latex_of_register reg =
     let reg_name = Register.to_string reg in
-    (* TODO brady: get rid of bad symbols *)
+    (* TODO brady: get rid of bad symbols (just underscore?) I don't
+       think we should allow spaces or other weird things in the register
+       names. Other than underscore it should be the job of the frontend. *)
     [%string "R_{%{reg_name}}"]
 
   let latex_wrap_lr left right latex =

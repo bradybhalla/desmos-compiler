@@ -3,18 +3,6 @@ open! Desmos_compiler
 open! Languages
 open! Types
 
-(*
-
-let compile prog =
-  prog |> Pass_analyze_call_liveness.compile
-  |> Pass_convert_functions_to_stack.compile
-  |> Pass_explicit_program_counter.compile |> Pass_extract_registers.compile
-
-let print_register t register_name =
-  let r = Register.of_string register_name in
-  let v = Hashtbl.find_exn t.Desmos_vm_emulator.registers r in
-  Printf.printf "%.1f\n" v
-
 let prog_fib input_n =
   let open Register_func_instrs in
   let fib = Function_name.of_string "fib" in
@@ -64,10 +52,10 @@ let prog_fib input_n =
                                 Register b;
                                 Add (Register a, Register b);
                               ];
-                            ret = Some result;
+                            ret = Some a;
                           };
                       ];
-                    control_flow = Return (Register result);
+                    control_flow = Return (Register a);
                   };
                 ];
             } );
@@ -75,6 +63,7 @@ let prog_fib input_n =
     main =
       [
         {
+          label = Label.of_string "main";
           body =
             [
               Call
@@ -145,7 +134,7 @@ let prog_gcd input_a input_b =
     main =
       [
         {
-          label = entry_label;
+          label = Label.of_string "main";
           body =
             [
               Call
@@ -161,25 +150,7 @@ let prog_gcd input_a input_b =
       ];
   }
 
-let%expect_test "fib" =
-  let t = prog_fib 0 |> compile |> Desmos_vm_emulator.run_until_done in
-  print_register t "result";
-  [%expect {| 0.0 |}];
-  let t = prog_fib 2 |> compile |> Desmos_vm_emulator.run_until_done in
-  print_register t "result";
-  [%expect {| 1.0 |}];
-  let t = prog_fib 12 |> compile |> Desmos_vm_emulator.run_until_done in
-  print_register t "result";
-  [%expect {| 144.0 |}]
-
-let%expect_test "gcd" =
-  let t = prog_gcd 6 9 |> compile |> Desmos_vm_emulator.run_until_done in
-  print_register t "result";
-  [%expect {| 3.0 |}];
-  let t = prog_gcd 432 123 |> compile |> Desmos_vm_emulator.run_until_done in
-  print_register t "result";
-  [%expect {| 3.0 |}];
-  let t = prog_gcd 432 1231 |> compile |> Desmos_vm_emulator.run_until_done in
-  print_register t "result";
-  [%expect {| 1.0 |}]
-  *)
+let compile_to_vm prog =
+  prog |> Pass_analyze_call_liveness.compile
+  |> Pass_convert_functions_to_stack.compile
+  |> Pass_explicit_program_counter.compile |> Pass_extract_registers.compile

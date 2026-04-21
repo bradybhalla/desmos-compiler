@@ -1,10 +1,13 @@
 open! Core
 open! Languages
 open! Types
+open Desmos_virtual_machine
 module RegHashtbl = Hashtbl.Make (Register)
 
-(* TODO: make this type more sane *)
-type instr = (Register.t * Desmos_virtual_machine.generalized_set) list option
+(* TODO: make this type more sane maybe with more types defined inside of it.
+   If we get rid of Exit in Desmos_virtual_machine then we won't need to have
+   the option there any more and it will be nicer *)
+type instr = (Register.t * generalized_set_action) list option
 
 type t = {
   instrs : instr array;
@@ -14,23 +17,38 @@ type t = {
   mutable program_counter : int;
 }
 
-let create (program : Register.Set.t Languages.Desmos_virtual_machine.t) =
+let evaluate_initial_register_value = function
+  | Num n -> n
+  | Bool b -> if b then 1. else 0.
+  | Add (_, _)
+  | Sub (_, _)
+  | Mult (_, _)
+  | Div (_, _)
+  | Mod (_, _)
+  | And (_, _)
+  | Or (_, _)
+  | Not _ | Register _ | LabelLineNumber _ | If_expr _ ->
+      failwith "initial expression should be a constant"
+
+let create program =
   (* initialize registers *)
   let registers = RegHashtbl.create () in
   let register_stacks = RegHashtbl.create () in
-  Set.iter program.info ~f:(fun r ->
-      Hashtbl.add_exn registers ~key:r ~data:0.;
+  Map.iteri program.info ~f:(fun ~key:r ~data:init_expr ->
+      Hashtbl.add_exn registers ~key:r
+        ~data:(evaluate_initial_register_value init_expr);
       Hashtbl.add_exn register_stacks ~key:r ~data:[]);
   (* build program representation *)
   let _, label_line_lookup, rev_instrs =
     List.fold_left program.main ~init:(0, Label.Map.empty, [])
-      ~f:(fun (index, label_lookup, rev_instrs) -> function
-      (* add label at the current index *)
-      | Label lbl ->
-          (index, Map.add_exn label_lookup ~key:lbl ~data:index, rev_instrs)
-      (* add instruction and increment index *)
-      | Instruction i -> (index + 1, label_lookup, Some i :: rev_instrs)
-      | Exit -> (index + 1, label_lookup, None :: rev_instrs))
+      ~f:(fun (index, label_lookup, rev_instrs) block ->
+        let label_lookup =
+          Map.add_exn label_lookup ~key:block.label ~data:index
+        in
+        List.fold_left block.body ~init:(index, label_lookup, rev_instrs)
+          ~f:(fun (index, label_lookup, rev_instrs) -> function
+          | Instruction i -> (index + 1, label_lookup, Some i :: rev_instrs)
+          | Exit -> (index + 1, label_lookup, None :: rev_instrs)))
   in
   {
     instrs = rev_instrs |> List.rev |> Array.of_list;
@@ -45,7 +63,7 @@ let is_true v = v ==. 1. (* bools represented as 0/1 *)
 
 let rec eval_expr expr ~t =
   match expr with
-  | Desmos_virtual_machine.Register r -> Hashtbl.find_exn t.registers r
+  | Register r -> Hashtbl.find_exn t.registers r
   | Num f -> f
   | Bool b -> if b then 1. else 0.
   | Add (a, b) -> eval_expr ~t a +. eval_expr ~t b
@@ -71,7 +89,7 @@ let rec eval_expr expr ~t =
 
 and eval_cond cond ~t =
   match cond with
-  | Desmos_virtual_machine.BoolVal e -> eval_expr ~t e
+  | BoolVal e -> eval_expr ~t e
   | Compare (op, a, b) ->
       let a = eval_expr ~t a in
       let b = eval_expr ~t b in
@@ -120,7 +138,7 @@ let step t =
       `Not_done
 
 (* Make this language type more sane *)
-let run_until_done (vm_prog : Register.Set.t Desmos_virtual_machine.t) =
+let run_until_done vm_prog =
   let t = create vm_prog in
   let rec loop () = match step t with `Done -> t | `Not_done -> loop () in
   loop ()
