@@ -1,4 +1,4 @@
-# Created 2026-04-20 Mon 23:27
+# Created 2026-04-21 Tue 13:48
 #+title: Desmos compiler
 #+author: Brady Bhalla
 #+filetags: :project:
@@ -10,74 +10,93 @@ learned about assembly or compilers at all yet so it was pretty bad.
 
 I am working on a new version as part of a [[id:97B0001F-6FB3-47B6-9821-D0E69DC27FDD][CS 81]] project.
 * TODO Next things to do
-next up (before class):
-- add register initialization and other info to be computed in the extract registers pass (rename to compare registers)
+** next up (before class)
+- add register initialization and other info to be computed in the extract registers pass (rename to prepare registers)
 - make the VM emulator use the given register initialization
 - test the vm fully for the fib program (also test in actual desmos)
 - fill out TODOs in pass descriptions below
 - make the frontend language
+** Think hard about optimizations
+- rearrange while you still have liveness information about registers (while
+  functions are still around). bring as many sets as you can before a function
+  call? or maybe after the call so they don't need to be saved?
+- condense once we get to Desmos_virutal_machine. assume we already have the
+  ordering down by this point and should just squish as many statements together
+  as possible? We also could allow for a little bit of reordering.
+** Think about if you want to make desmos output the vm language instead
+Then emulation would be even more similar to how things run in desmos. The
+current desmos_vm would be "<figure out name>" and would be the main language
+for optimizations. That way I could make it slightly more complex and not have
+to worry about emulating it. This is a problem for later though.
+** things that are weird
+- conditionals (do we need a bool and conditional? it makes the output nicer but
+  maybe isn't actually necessary )
+- some types are hard to read (alias as modules?)
+- do functions really need an entry_label? maybe just have the helper function
+  get imported everywhere and assume it starts the same way as "main".
+- desmos virutal machine doesn't need an Exit, we should be able to remove that
 
-Think hard about optimizations:
-- rearrange while you still have liveness information about registers (while functions are still around). bring as many sets as you can before a function call? or maybe after the call so they don't need to be saved?
-- condense once we get to Desmos_virutal_machine. assume we already have the ordering down by this point and should just squish as many statements together as possible? We also could allow for a little bit of reordering.
-
-things that are weird
-- conditionals (do we need a bool and conditional? it makes the output nicer but maybe isn't actually necessary )
-- some types are hard to read (alias in modules)
-- do functions really need an entry_label? maybe just have the helper function get imported everywhere and assume it starts the same way as "main".
-- should Desmos_virutal_machine actually be flat? some things feel nicer if it is blocked still?
-
-we don't really need a link register if we have program_counter. however, it shows up too late into the compilation so maybe sticking with link is the way to go. I think I could just implement "link" in the pc register anyway and it would all work out fine.
+we don't really need a link register if we have program_counter. however, it
+shows up too late into the compilation so maybe sticking with link is the way to
+go. I think I could just implement "link" in the pc register anyway and it would
+all work out fine.
+** add a reset action
+** Register naming safety
+Adding "stack" isn't very safe. Since I won't allow numbers at the beginning of
+variables, I can use "R_{0xx}" for registers like return/pc, "R_{1xxStack}" for
+variable stacks. "R_{xx}" for normal registers.
 * Overview of compiler (up to date as of 4/21)
-** TODO unit Register_func_instrs                                  :language:
+** Register_func_instrs                                            :language:
 The current starting language, which is essentially a register-based instruction
 set that has support for functions. Since Desmos can handle complex instructions
 in each update rule, the instructions in this language can contain full
-expressions (unlike assembly). The different statements are:
+expressions (unlike assembly). The different things you can do are:
 - Set a register to an expression
 - Jump to the label of the first true condition, otherwise to the default label
 - Call a function and possibly put the output in the given register
 - Return an expression from a function
-- Label that can be jumped to
-** TODO "Analyze call liveness"                                        :pass:
-** TODO (Register.Set.t option) Register_func_instrs               :language:
+** "Analyze call liveness"                                             :pass:
+Go through the instructions and figure out which registers are "live" at each
+"Call" instruction. Right now this is just all the registers in the
+function/main.
+** Register_func_instrs_with_call_liveness                         :language:
 Same as previous language but each "Call" statement has information about what
-registers are live at that point.
+registers are live.
 ** "Convert functions to stack"                                        :pass:
-Compile function calls and handle register saving by pushing/popping to local
-stacks.
-** TODO Register_stack_instrs                                      :language:
+Compile functions and replace call stacks with local per-register stacks. The
+live registers are used to determine which registers need to saved and restored.
+** Register_stack_instrs                                           :language:
 A register-based instruction set like the previous language, but doesn't have
 direct support for functions anymore. Each register has a stack that its value
-can be pushed/popped from. The statements are
+can be pushed/popped from. The things you can do are
 - GeneralizedSet a list of (register,expression) pairs. All expressions are
   computed before any register is set, and there is an option to push/pop
   register values.
-- Link_push_jump will push the next line to the call stack and jump to the
-  label. This is needed to facilitate function returns.
-- Link_pop_jump will pop the line from the call stack and jump to it.
-- Label that can be jumped to
-- Exit the program
-** TODO "Explicit program counter"                                     :pass:
-Each instruction specifies what should happen to the program counter next
-(continue to the next instruction, exit the program, branch).
-** TODO unit Desmos_virtual_machine                                :language:
+- JumpLink will set the link register to the next line and jump to the label.
+  This is the only control flow that can go in the middle of a block, which is
+  allowed because the program will eventually return here.
+- Return will set the program counter to the link register value.
+** "Make program counter explicit"                                     :pass:
+Treat the program counter as a normal register which needs to be manually
+updated at every step.
+** unit Desmos_virtual_machine                                     :language:
 The target language of the compiler which can be almost directly translated to
-Desmos after resolving labels. The instructions are all of the form (list of
-generalized sets, pc action).
-- The list of generalized sets is the same as the previous language, where
-  registers are set/pushed/popped.
-- The pc action can be going to the next instruction, conditionally jumping to
-  labels/registers, or exiting the program.
-** TODO "Extract registers"                                            :pass:
-** TODO Register.Set.t Desmos_virtual_machine                      :language:
+Desmos after resolving labels. The instructions just set/pop/push registers and
+exit the program when it is complete.
+** "Prepare registers"                                                 :pass:
+Find which registers are needed and what their initial values should be. For now
+every register starts at 1.2345 except the program counter so it will hopefully
+be easier to detect bugs if a value is never set.
+** expr Register.Map.t Desmos_virtual_machine.t                    :language:
+Same as the previous language but there is a map describing initial values of
+all necessary registers.
 ** "Generate Desmos output"                                            :pass:
-Generate an OCaml representation of the actual Desmos expressions which will be
+Generate an OCaml representation of the actual Desmos expressions that will be
 used to run the program.
 ** Desmos_output                                                   :language:
-Desmos expressions that will run the program as the action is repeatedly
-evaluated. It is printed as JavaScript code which can be pasted into the console
-to insert all necessary expressions into the calculator.
+Desmos expressions that will simulate the program when the main action is
+repeatedly run. This language prints out JavaScript code that will insert all
+necessary expressions in Desmos when pasted into the console.
 * Emulator for Register.Set.t Desmos_virtual_machine
 Used for testing without actually needing to run things in Desmos. This avoids
 having to do a lot of annoying browser automation. This language is pretty close

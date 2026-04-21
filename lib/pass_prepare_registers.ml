@@ -42,7 +42,8 @@ let registers_in_stmt = function
           Set.add expr_regs reg)
       |> Register.Set.union_list
 
-let compile program =
+let compile program :
+    Desmos_virtual_machine.expr Register.Map.t Desmos_virtual_machine.t =
   let registers =
     List.concat_map program.main ~f:(fun block ->
         List.map block.body ~f:registers_in_stmt)

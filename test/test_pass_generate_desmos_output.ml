@@ -17,11 +17,11 @@ let%expect_test "0 instructions" =
   [%expect
     {|
     ((program_action ((conds ()) (default ((00pc (Register 00pc))))))
-     (init_registers ((00pc (Num 0)) (00pcStack (ListLiteral ((Num 1.2345)))))))
+     (init_registers ((00pc (Num 0)) (00pcStack (ListLiteral ((Num 5.4321)))))))
     |}];
   output |> Desmos_output.to_pastable_javascript |> print_endline;
   [%expect
-    {| Calc.setExpressions([{latex: "R_{00pc}\\to R_{00pc}"}, {latex: "R_{00pc}=0"}, {latex: "R_{00pcStack}=\\left[1.2345\\right]"}]) |}]
+    {| Calc.setExpressions([{latex: "R_{00pc}\\to R_{00pc}"}, {latex: "R_{00pc}=0"}, {latex: "R_{00pcStack}=\\left[5.4321\\right]"}]) |}]
 
 let%expect_test "multiple instructions" =
   let prog : Desmos_virtual_machine.expr Register.Map.t Desmos_virtual_machine.t
@@ -58,13 +58,13 @@ let%expect_test "multiple instructions" =
          ((Compare Eq (Register 00pc) (Num 2)) ((00pc (Num -1))))))
        (default ((00pc (Register 00pc))))))
      (init_registers
-      ((00pc (Num 0)) (00pcStack (ListLiteral ((Num 1.2345)))) (a (Num 0))
-       (aStack (ListLiteral ((Num 1.2345)))) (b (Num 0))
-       (bStack (ListLiteral ((Num 1.2345)))))))
+      ((00pc (Num 0)) (00pcStack (ListLiteral ((Num 5.4321)))) (a (Num 0))
+       (aStack (ListLiteral ((Num 5.4321)))) (b (Num 0))
+       (bStack (ListLiteral ((Num 5.4321)))))))
     |}];
   output |> Desmos_output.to_pastable_javascript |> print_endline;
   [%expect
-    {| Calc.setExpressions([{latex: "\\left\\{R_{00pc} = 0: \\left(R_{a}\\to 1, R_{b}\\to 2\\right), R_{00pc} = 1: R_{a}\\to R_{a}, R_{00pc} = 2: R_{00pc}\\to -1, R_{00pc}\\to R_{00pc}\\right\\}"}, {latex: "R_{00pc}=0"}, {latex: "R_{00pcStack}=\\left[1.2345\\right]"}, {latex: "R_{a}=0"}, {latex: "R_{aStack}=\\left[1.2345\\right]"}, {latex: "R_{b}=0"}, {latex: "R_{bStack}=\\left[1.2345\\right]"}]) |}]
+    {| Calc.setExpressions([{latex: "\\left\\{R_{00pc} = 0: \\left(R_{a}\\to 1, R_{b}\\to 2\\right), R_{00pc} = 1: R_{a}\\to R_{a}, R_{00pc} = 2: R_{00pc}\\to -1, R_{00pc}\\to R_{00pc}\\right\\}"}, {latex: "R_{00pc}=0"}, {latex: "R_{00pcStack}=\\left[5.4321\\right]"}, {latex: "R_{a}=0"}, {latex: "R_{aStack}=\\left[5.4321\\right]"}, {latex: "R_{b}=0"}, {latex: "R_{bStack}=\\left[5.4321\\right]"}]) |}]
 
 let%expect_test "push and pop" =
   let prog : Desmos_virtual_machine.expr Register.Map.t Desmos_virtual_machine.t
@@ -120,15 +120,15 @@ let%expect_test "push and pop" =
          ((Compare Eq (Register 00pc) (Num 1)) ((00pc (Num -1))))))
        (default ((00pc (Register 00pc))))))
      (init_registers
-      ((00pc (Num 0)) (00pcStack (ListLiteral ((Num 1.2345)))) (a (Num 0))
-       (aStack (ListLiteral ((Num 1.2345)))) (b (Num 0))
-       (bStack (ListLiteral ((Num 1.2345)))) (c (Num 0))
-       (cStack (ListLiteral ((Num 1.2345)))) (d (Num 0))
-       (dStack (ListLiteral ((Num 1.2345)))))))
+      ((00pc (Num 0)) (00pcStack (ListLiteral ((Num 5.4321)))) (a (Num 0))
+       (aStack (ListLiteral ((Num 5.4321)))) (b (Num 0))
+       (bStack (ListLiteral ((Num 5.4321)))) (c (Num 0))
+       (cStack (ListLiteral ((Num 5.4321)))) (d (Num 0))
+       (dStack (ListLiteral ((Num 5.4321)))))))
     |}];
   output |> Desmos_output.to_pastable_javascript |> print_endline;
   [%expect
-    {| Calc.setExpressions([{latex: "\\left\\{R_{00pc} = 0: \\left(R_{aStack}\\to \\operatorname{join}\\left(R_{aStack}, R_{a}\\right), R_{b}\\to R_{bStack}\\left[\\operatorname{length}\\left(R_{bStack}\\right)\\right], R_{bStack}\\to R_{bStack}\\left[1 ... \\left(\\operatorname{length}\\left(R_{bStack}\\right) - 1\\right)\\right], R_{c}\\to 1, R_{dStack}\\to \\operatorname{join}\\left(R_{dStack}, R_{d}\\right), R_{d}\\to 1\\right), R_{00pc} = 1: R_{00pc}\\to -1, R_{00pc}\\to R_{00pc}\\right\\}"}, {latex: "R_{00pc}=0"}, {latex: "R_{00pcStack}=\\left[1.2345\\right]"}, {latex: "R_{a}=0"}, {latex: "R_{aStack}=\\left[1.2345\\right]"}, {latex: "R_{b}=0"}, {latex: "R_{bStack}=\\left[1.2345\\right]"}, {latex: "R_{c}=0"}, {latex: "R_{cStack}=\\left[1.2345\\right]"}, {latex: "R_{d}=0"}, {latex: "R_{dStack}=\\left[1.2345\\right]"}]) |}]
+    {| Calc.setExpressions([{latex: "\\left\\{R_{00pc} = 0: \\left(R_{aStack}\\to \\operatorname{join}\\left(R_{aStack}, R_{a}\\right), R_{b}\\to R_{bStack}\\left[\\operatorname{length}\\left(R_{bStack}\\right)\\right], R_{bStack}\\to R_{bStack}\\left[1 ... \\left(\\operatorname{length}\\left(R_{bStack}\\right) - 1\\right)\\right], R_{c}\\to 1, R_{dStack}\\to \\operatorname{join}\\left(R_{dStack}, R_{d}\\right), R_{d}\\to 1\\right), R_{00pc} = 1: R_{00pc}\\to -1, R_{00pc}\\to R_{00pc}\\right\\}"}, {latex: "R_{00pc}=0"}, {latex: "R_{00pcStack}=\\left[5.4321\\right]"}, {latex: "R_{a}=0"}, {latex: "R_{aStack}=\\left[5.4321\\right]"}, {latex: "R_{b}=0"}, {latex: "R_{bStack}=\\left[5.4321\\right]"}, {latex: "R_{c}=0"}, {latex: "R_{cStack}=\\left[5.4321\\right]"}, {latex: "R_{d}=0"}, {latex: "R_{dStack}=\\left[5.4321\\right]"}]) |}]
 
 let%expect_test "nested if_expr" =
   let prog : Desmos_virtual_machine.expr Register.Map.t Desmos_virtual_machine.t
@@ -187,9 +187,9 @@ let%expect_test "nested if_expr" =
          ((Compare Eq (Register 00pc) (Num 1)) ((00pc (Num -1))))))
        (default ((00pc (Register 00pc))))))
      (init_registers
-      ((00pc (Num 0)) (00pcStack (ListLiteral ((Num 1.2345)))) (a (Num 0))
-       (aStack (ListLiteral ((Num 1.2345)))))))
+      ((00pc (Num 0)) (00pcStack (ListLiteral ((Num 5.4321)))) (a (Num 0))
+       (aStack (ListLiteral ((Num 5.4321)))))))
     |}];
   output |> Desmos_output.to_pastable_javascript |> print_endline;
   [%expect
-    {| Calc.setExpressions([{latex: "\\left\\{R_{00pc} = 0: R_{a}\\to \\left\\{1 > 1: 1, 1 > 1: 2, 3\\right\\}, R_{00pc} = 1: R_{00pc}\\to -1, R_{00pc}\\to R_{00pc}\\right\\}"}, {latex: "R_{00pc}=0"}, {latex: "R_{00pcStack}=\\left[1.2345\\right]"}, {latex: "R_{a}=0"}, {latex: "R_{aStack}=\\left[1.2345\\right]"}]) |}]
+    {| Calc.setExpressions([{latex: "\\left\\{R_{00pc} = 0: R_{a}\\to \\left\\{1 > 1: 1, 1 > 1: 2, 3\\right\\}, R_{00pc} = 1: R_{00pc}\\to -1, R_{00pc}\\to R_{00pc}\\right\\}"}, {latex: "R_{00pc}=0"}, {latex: "R_{00pcStack}=\\left[5.4321\\right]"}, {latex: "R_{a}=0"}, {latex: "R_{aStack}=\\left[5.4321\\right]"}]) |}]

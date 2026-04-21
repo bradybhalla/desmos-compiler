@@ -97,7 +97,7 @@ let compile (program : _ Desmos_virtual_machine.t) =
                 Every stack starts with an element so valid code should never be able
                 to remove it. This is also useful because our current "pop" function
                 doesn't work for lists of size 0/1. *)
-             (get_stack_register reg, ListLiteral [ Num 1.2345 ]);
+             (get_stack_register reg, ListLiteral [ Num 5.4321 ]);
            ])
   in
   { program_action; init_registers }

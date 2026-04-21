@@ -1,4 +1,4 @@
-# Created 2026-04-20 Mon 23:27
+# Created 2026-04-21 Tue 13:48
 #+title: Desmos compiler (CS 81)
 #+author: Brady Bhalla
 #+filetags: :course:
@@ -29,8 +29,19 @@ point I should probably write a few larger programs that I can test the
 input/output of as they go through each pass.
 ** Meeting 4/21
 *** DONE finish generate output pass
-*** TODO Languages Refactor
-- [ ] put general information like what registers are used in any given block of
+The language type matches the Desmos expression format. The program can be printed as
+javascript and pasted into the console which will populate the Desmos graph with
+everything needed to run the program.
+*** DONE Languages Refactor
+I wanted to make the languages slightly different so hopefully future
+optimizations will be much easier. I now keep instructions in blocks by label,
+handle conditionals in a way that integrates into Desmos more easily, and handle
+control flow slightly differently. I also separated out some logic into separate
+passes (namely for computing live registers and extracting register info). These
+two passes are still very basic but at least they are their own passes so can be
+made more complex in the future.
+
+- [X] put general information like what registers are used in any given block of
   code in a much earlier pass. Right now I do a lot of repeated work.
 - [X] liveness analysis into a new pass (still keep very basic for now). Also
   can compress blocks with only one incoming block.
@@ -39,6 +50,11 @@ input/output of as they go through each pass.
   language. I think this would help with compression optimizations later. or
   maybe the compression should happen in the stack language instead? probably
   not because this wouldn't allow for compressing the PC.
+*** DONE Better testing
+- [X] smaller targeted tests
+- [X] once frontend is ready do a medium/large program that will hopefully catch
+  small issues (not ready yet but it can be very quickly added)
+** TODO Meeting 4/28
 *** TODO C-like Frontend with actual syntax
 - parse expressions
 - still sexp-based for now
@@ -51,18 +67,12 @@ input/output of as they go through each pass.
   - calls have correct number of args
   - registers defined before being used
   - are there any unused registers?
-*** TODO Better testing framework
-Write a few medium sized programs. Save intermediate results for all the passes
-and expect_test that the compilers produce the right output.
-
-Write more targeted tests for the emulator (evaluation order, etc)
-*** TODO Desmos expression integration
-- Desmos expressions the user can define.
-- All variables used in them must be global and are not allowed to be put on a
-  stack, so some renaming is needed.
+*** TODO Type safety
+- Right now there should just be "num" and "bool"
+- Each expression should track what type it has
+- this doesn't matter as much for now but will be needed to add lists
 ** Future plans
-*** Type safety
-*** Lists (lists of lists?)
+*** Lists (and lists of lists)
 - could be stored like
   [ 1st start ind, 2nd start ind, ...,
 1st->   length, val1, val2, val3
@@ -70,6 +80,10 @@ Write more targeted tests for the emulator (evaluation order, etc)
    ]
 - with a lot of very careful indexing we could have arbitrary lists
 - now how do we handle the length cap?
+*** Desmos expression integration
+- Desmos expressions the user can define.
+- All variables used in them must be global and are not allowed to be put on a
+  stack, so some renaming is needed
 *** Compression
 - compress instructions within a block. graph based approach? I think there
   should be a greedy way to do it optimally?

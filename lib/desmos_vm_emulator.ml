@@ -131,7 +131,7 @@ let step t =
       (* set new values *)
       List.iter values_to_set ~f:(fun (reg, value) ->
           Hashtbl.set t.registers ~key:reg ~data:value);
-      (* update pc *)
+      (* read next value of program counter from its register *)
       t.program_counter <-
         Hashtbl.find_exn t.registers program_counter_reg
         |> Float.round_nearest |> Float.to_int;
