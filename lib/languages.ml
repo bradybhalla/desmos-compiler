@@ -61,6 +61,10 @@ module Register_func_instrs = struct
 end
 
 module Register_func_instrs_with_call_liveness = struct
+  (* TODO brady: maybe we can change this to use the same parameterized type as
+     the previous language? it is kind of annoying to have a whole separate
+     language that doesn't really change anything except a single record field
+     *)
   type expr = Register_func_instrs.expr [@@deriving sexp]
   type control_flow = Register_func_instrs.control_flow [@@deriving sexp]
 

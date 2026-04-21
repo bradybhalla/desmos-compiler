@@ -3,6 +3,12 @@ open! Desmos_compiler
 open! Languages
 open! Types
 
+let compile_to_vm prog =
+  prog |> Pass_analyze_call_liveness.compile
+  |> Pass_convert_functions_to_stack.compile
+  |> Pass_make_program_counter_explicit.compile
+  |> Pass_prepare_registers.compile
+
 let prog_fib input_n =
   let open Register_func_instrs in
   let fib = Function_name.of_string "fib" in
@@ -149,8 +155,3 @@ let prog_gcd input_a input_b =
         };
       ];
   }
-
-let compile_to_vm prog =
-  prog |> Pass_analyze_call_liveness.compile
-  |> Pass_convert_functions_to_stack.compile
-  |> Pass_explicit_program_counter.compile |> Pass_extract_registers.compile

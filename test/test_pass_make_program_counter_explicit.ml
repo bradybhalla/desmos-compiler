@@ -20,7 +20,7 @@ let%expect_test "normal instructions compile correctly" =
       };
     ]
   in
-  prog |> Pass_explicit_program_counter.compile
+  prog |> Pass_make_program_counter_explicit.compile
   |> Desmos_virtual_machine.sexp_of_t sexp_of_unit
   |> print_s;
   [%expect
@@ -58,7 +58,7 @@ let%expect_test "jump compiles correctly" =
       };
     ]
   in
-  prog |> Pass_explicit_program_counter.compile
+  prog |> Pass_make_program_counter_explicit.compile
   |> Desmos_virtual_machine.sexp_of_t sexp_of_unit
   |> print_s;
   [%expect
@@ -91,7 +91,7 @@ let%expect_test "JumpLink compiles correctly" =
       };
     ]
   in
-  prog |> Pass_explicit_program_counter.compile
+  prog |> Pass_make_program_counter_explicit.compile
   |> Desmos_virtual_machine.sexp_of_t sexp_of_unit
   |> print_s;
   [%expect
@@ -119,7 +119,7 @@ let%expect_test "return compiles correctly" =
       };
     ]
   in
-  prog |> Pass_explicit_program_counter.compile
+  prog |> Pass_make_program_counter_explicit.compile
   |> Desmos_virtual_machine.sexp_of_t sexp_of_unit
   |> print_s;
   [%expect

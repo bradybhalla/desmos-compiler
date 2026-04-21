@@ -43,7 +43,7 @@ let%expect_test "registers extracted from stmts, exprs, and jumps" =
       info = ();
     }
   in
-  (Pass_extract_registers.compile prog).info
+  (Pass_prepare_registers.compile prog).info
   |> Register.Map.sexp_of_t Desmos_virtual_machine.sexp_of_expr
   |> print_s;
   [%expect
