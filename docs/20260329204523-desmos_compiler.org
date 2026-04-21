@@ -1,4 +1,4 @@
-# Created 2026-04-14 Tue 14:15
+# Created 2026-04-20 Mon 23:27
 #+title: Desmos compiler
 #+author: Brady Bhalla
 #+filetags: :project:
@@ -9,8 +9,27 @@ I made a first version of this around sophomore year of college, but I hadn't
 learned about assembly or compilers at all yet so it was pretty bad.
 
 I am working on a new version as part of a [[id:97B0001F-6FB3-47B6-9821-D0E69DC27FDD][CS 81]] project.
-* Overview of intermediate languages (up to date as of 4/14)
-** Register_func_instrs
+* TODO Next things to do
+next up (before class):
+- add register initialization and other info to be computed in the extract registers pass (rename to compare registers)
+- make the VM emulator use the given register initialization
+- test the vm fully for the fib program (also test in actual desmos)
+- fill out TODOs in pass descriptions below
+- make the frontend language
+
+Think hard about optimizations:
+- rearrange while you still have liveness information about registers (while functions are still around). bring as many sets as you can before a function call? or maybe after the call so they don't need to be saved?
+- condense once we get to Desmos_virutal_machine. assume we already have the ordering down by this point and should just squish as many statements together as possible? We also could allow for a little bit of reordering.
+
+things that are weird
+- conditionals (do we need a bool and conditional? it makes the output nicer but maybe isn't actually necessary )
+- some types are hard to read (alias in modules)
+- do functions really need an entry_label? maybe just have the helper function get imported everywhere and assume it starts the same way as "main".
+- should Desmos_virutal_machine actually be flat? some things feel nicer if it is blocked still?
+
+we don't really need a link register if we have program_counter. however, it shows up too late into the compilation so maybe sticking with link is the way to go. I think I could just implement "link" in the pc register anyway and it would all work out fine.
+* Overview of compiler (up to date as of 4/21)
+** TODO unit Register_func_instrs                                  :language:
 The current starting language, which is essentially a register-based instruction
 set that has support for functions. Since Desmos can handle complex instructions
 in each update rule, the instructions in this language can contain full
@@ -20,7 +39,14 @@ expressions (unlike assembly). The different statements are:
 - Call a function and possibly put the output in the given register
 - Return an expression from a function
 - Label that can be jumped to
-** Register_stack_instrs
+** TODO "Analyze call liveness"                                        :pass:
+** TODO (Register.Set.t option) Register_func_instrs               :language:
+Same as previous language but each "Call" statement has information about what
+registers are live at that point.
+** "Convert functions to stack"                                        :pass:
+Compile function calls and handle register saving by pushing/popping to local
+stacks.
+** TODO Register_stack_instrs                                      :language:
 A register-based instruction set like the previous language, but doesn't have
 direct support for functions anymore. Each register has a stack that its value
 can be pushed/popped from. The statements are
@@ -32,7 +58,10 @@ can be pushed/popped from. The statements are
 - Link_pop_jump will pop the line from the call stack and jump to it.
 - Label that can be jumped to
 - Exit the program
-** Desmos_virtual_machine
+** TODO "Explicit program counter"                                     :pass:
+Each instruction specifies what should happen to the program counter next
+(continue to the next instruction, exit the program, branch).
+** TODO unit Desmos_virtual_machine                                :language:
 The target language of the compiler which can be almost directly translated to
 Desmos after resolving labels. The instructions are all of the form (list of
 generalized sets, pc action).
@@ -40,26 +69,19 @@ generalized sets, pc action).
   registers are set/pushed/popped.
 - The pc action can be going to the next instruction, conditionally jumping to
   labels/registers, or exiting the program.
-*** Emulator
-This language has an OCaml emulator so it can be tested without actually needing
-to run things in Desmos. This avoids having to do a lot of annoying browser
-automation.
-** Desmos_output
-Generated Desmos expressions that simulate the virtual machine language. The
-output is JavaScript that can be pasted into the console to insert all necessary
-expressions.
-* Overview of passes (up to date as of 4/14)
-** convert functions to stack
-*Register_func_instrs -> Register_stack_instrs*
-
-Compile function calls and handle register saving with pushing/popping to local
-stacks.
-** explicit program counter
-*Register_stack_instrs -> Desmos_virtual_machine*
-
-Each instruction specifies what should happen to the program counter next
-(continue to the next instruction, exit the program, branch).
-** generate desmos output
-*Desmos_virtual_machine -> Desmos_output*
-
-Generate actual Desmos expressions to simulate the virtual machine.
+** TODO "Extract registers"                                            :pass:
+** TODO Register.Set.t Desmos_virtual_machine                      :language:
+** "Generate Desmos output"                                            :pass:
+Generate an OCaml representation of the actual Desmos expressions which will be
+used to run the program.
+** Desmos_output                                                   :language:
+Desmos expressions that will run the program as the action is repeatedly
+evaluated. It is printed as JavaScript code which can be pasted into the console
+to insert all necessary expressions into the calculator.
+* Emulator for Register.Set.t Desmos_virtual_machine
+Used for testing without actually needing to run things in Desmos. This avoids
+having to do a lot of annoying browser automation. This language is pretty close
+to the Desmos_output language but is more readable so I think it will be much
+easier to debug. This is also the language that some of the optimizations are
+going to happen in to being able to run before and after will be nice.
+* Overview of compiler (up to date as of 4/14)                      :ARCHIVE:

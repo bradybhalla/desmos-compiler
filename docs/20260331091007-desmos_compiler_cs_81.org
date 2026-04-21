@@ -1,4 +1,4 @@
-# Created 2026-04-14 Tue 14:15
+# Created 2026-04-20 Mon 23:27
 #+title: Desmos compiler (CS 81)
 #+author: Brady Bhalla
 #+filetags: :course:
@@ -28,7 +28,17 @@ The testing is very basic but it should give a good enough base for now. At some
 point I should probably write a few larger programs that I can test the
 input/output of as they go through each pass.
 ** Meeting 4/21
-*** TODO finish generate output pass
+*** DONE finish generate output pass
+*** TODO Languages Refactor
+- [ ] put general information like what registers are used in any given block of
+  code in a much earlier pass. Right now I do a lot of repeated work.
+- [X] liveness analysis into a new pass (still keep very basic for now). Also
+  can compress blocks with only one incoming block.
+- [X] Put instructions in blocks instead of labels alongside instructions
+- [X] maybe keep the idea of jump with link and return even in the last
+  language. I think this would help with compression optimizations later. or
+  maybe the compression should happen in the stack language instead? probably
+  not because this wouldn't allow for compressing the PC.
 *** TODO C-like Frontend with actual syntax
 - parse expressions
 - still sexp-based for now
@@ -41,23 +51,15 @@ input/output of as they go through each pass.
   - calls have correct number of args
   - registers defined before being used
   - are there any unused registers?
-*** TODO Languages Refactor
-- [ ] put general information like what registers are used in any given block of
-  code in a much earlier pass. Right now I do a lot of repeated work.
-- [ ] liveness analysis into a new pass (still keep very basic for now). Also
-  can compress blocks with only one incoming block.
-- [ ] Put instructions in blocks instead of labels alongside instructions
-- [ ] maybe keep the idea of jump with link and return even in the last
-  language. I think this would help with compression optimizations later. or
-  maybe the compression should happen in the stack language instead? probably
-  not because this wouldn't allow for compressing the PC.
+*** TODO Better testing framework
+Write a few medium sized programs. Save intermediate results for all the passes
+and expect_test that the compilers produce the right output.
+
+Write more targeted tests for the emulator (evaluation order, etc)
 *** TODO Desmos expression integration
 - Desmos expressions the user can define.
 - All variables used in them must be global and are not allowed to be put on a
   stack, so some renaming is needed.
-*** TODO Better testing framework
-Write a few medium sized programs. Save intermediate results for all the passes
-and expect_test that the compilers produce the right output.
 ** Future plans
 *** Type safety
 *** Lists (lists of lists?)

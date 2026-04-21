@@ -3,113 +3,126 @@ open! Desmos_compiler
 open! Languages
 open! Types
 
-(* This pass is pretty straightforward *)
-
-let%expect_test "check that registers get extracted correctly" =
-  let prog =
+let%expect_test "normal instructions compile correctly" =
+  let prog : Register_stack_instrs.t =
     let open Register_stack_instrs in
     let a = Register.of_string "a" in
-    let b = Register.of_string "b" in
-    let c = Register.of_string "c" in
-    let d = Register.of_string "d" in
-    let x = Register.of_string "x" in
-    let ret = Register.of_string ".ret" in
-    let f_label = Label.of_string "function_entrypoint_f" in
-    let g_label = Label.of_string "function_entrypoint_g" in
     [
       {
-        label = entry_label;
+        label = Label.of_string "normal_instrs";
         body =
           [
-            GeneralizedSet [ (c, Set (Num 1.)) ];
-            GeneralizedSet [ (d, Set (Num 2.)) ];
+            GeneralizedSet [ (a, Set (Num 5.)) ];
             GeneralizedSet
-              [
-                (a, Set (Register c));
-                (b, Set (Num 1.));
-                (c, Push);
-                (d, Push);
-                (x, Push);
-              ];
-            Link_push_jump f_label;
-            GeneralizedSet [ (c, Pop); (d, Pop); (x, Pop) ];
-            GeneralizedSet [ (x, Set (Register ret)) ];
-            Exit;
+              [ (Register.of_string "b", Set (Add (Register a, Num 1.))) ];
           ];
-      };
-      {
-        label = f_label;
-        body =
-          [
-            GeneralizedSet
-              [
-                (a, PushAndSet (Register a));
-                (b, PushAndSet (Register b));
-                (c, Push);
-              ];
-            Link_push_jump g_label;
-            GeneralizedSet [ (a, Pop); (b, Pop); (c, Pop) ];
-            GeneralizedSet [ (c, Set (Register ret)) ];
-            GeneralizedSet [ (ret, Set (Register c)) ];
-            Link_pop_jump;
-          ];
-      };
-      {
-        label = g_label;
-        body =
-          [
-            GeneralizedSet
-              [
-                (a, PushAndSet (Register a));
-                (b, PushAndSet (Register b));
-                (d, Push);
-              ];
-            Link_push_jump f_label;
-            GeneralizedSet [ (a, Pop); (b, Pop); (d, Pop) ];
-            GeneralizedSet [ (d, Set (Register ret)) ];
-            GeneralizedSet [ (ret, Set (Register d)) ];
-            Link_pop_jump;
-          ];
+        control_flow = Exit;
       };
     ]
   in
   prog |> Pass_explicit_program_counter.compile
-  |> Desmos_virtual_machine.sexp_of_t |> print_s;
-  [%expect {|
+  |> Desmos_virtual_machine.sexp_of_t sexp_of_unit
+  |> print_s;
+  [%expect
+    {|
     ((main
-      ((Label .main) (Instruction (((c (Set (Num 1)))) NextInstr))
-       (Instruction (((d (Set (Num 2)))) NextInstr))
+      ((Label normal_instrs)
        (Instruction
-        (((a (Set (Register c))) (b (Set (Num 1))) (c Push) (d Push) (x Push))
-         NextInstr))
+        ((00pc (Set (Add (Register 00pc) (Num 1)))) (a (Set (Num 5)))))
        (Instruction
-        (((00link (PushAndSet (Add ProgramCounter (Num 1)))))
-         (Jump (conds ()) (default (JumpToLabel function_entrypoint_f)))))
-       (Instruction (((c Pop) (d Pop) (x Pop)) NextInstr))
-       (Instruction (((x (Set (Register .ret)))) NextInstr))
-       (Instruction (() Exit)) (Label function_entrypoint_f)
+        ((00pc (Set (Add (Register 00pc) (Num 1))))
+         (b (Set (Add (Register a) (Num 1))))))
+       Exit))
+     (info ()))
+    |}]
+
+let%expect_test "jump compiles correctly" =
+  let prog : Register_stack_instrs.t =
+    let open Register_stack_instrs in
+    [
+      {
+        label = Label.of_string "conditional_jump";
+        body = [];
+        control_flow =
+          Jump
+            {
+              conds =
+                [
+                  ( Compare
+                      (Compare_op.Eq, Register (Register.of_string "c"), Num 0.),
+                    Label.of_string "target" );
+                ];
+              default = Label.of_string "default";
+            };
+      };
+    ]
+  in
+  prog |> Pass_explicit_program_counter.compile
+  |> Desmos_virtual_machine.sexp_of_t sexp_of_unit
+  |> print_s;
+  [%expect
+    {|
+    ((main
+      ((Label conditional_jump)
        (Instruction
-        (((a (PushAndSet (Register a))) (b (PushAndSet (Register b))) (c Push))
-         NextInstr))
+        ((00pc
+          (Set
+           (If_expr
+            (conds
+             (((Compare Eq (Register c) (Num 0)) (LabelLineNumber target))))
+            (default (LabelLineNumber default)))))))))
+     (info ()))
+    |}]
+
+let%expect_test "JumpLink compiles correctly" =
+  let prog : Register_stack_instrs.t =
+    let open Register_stack_instrs in
+    [
+      {
+        label = Label.of_string "jumplink_test";
+        body =
+          [
+            GeneralizedSet [ (Register.of_string "a", Set (Num 1.)) ];
+            JumpLink (Label.of_string "func");
+          ];
+        control_flow = Exit;
+      };
+    ]
+  in
+  prog |> Pass_explicit_program_counter.compile
+  |> Desmos_virtual_machine.sexp_of_t sexp_of_unit
+  |> print_s;
+  [%expect
+    {|
+    ((main
+      ((Label jumplink_test)
        (Instruction
-        (((00link (PushAndSet (Add ProgramCounter (Num 1)))))
-         (Jump (conds ()) (default (JumpToLabel function_entrypoint_g)))))
-       (Instruction (((a Pop) (b Pop) (c Pop)) NextInstr))
-       (Instruction (((c (Set (Register .ret)))) NextInstr))
-       (Instruction (((.ret (Set (Register c)))) NextInstr))
+        ((00pc (Set (Add (Register 00pc) (Num 1)))) (a (Set (Num 1)))))
        (Instruction
-        (((00link Pop)) (Jump (conds ()) (default (JumpToRegister 00link)))))
-       (Label function_entrypoint_g)
-       (Instruction
-        (((a (PushAndSet (Register a))) (b (PushAndSet (Register b))) (d Push))
-         NextInstr))
-       (Instruction
-        (((00link (PushAndSet (Add ProgramCounter (Num 1)))))
-         (Jump (conds ()) (default (JumpToLabel function_entrypoint_f)))))
-       (Instruction (((a Pop) (b Pop) (d Pop)) NextInstr))
-       (Instruction (((d (Set (Register .ret)))) NextInstr))
-       (Instruction (((.ret (Set (Register d)))) NextInstr))
-       (Instruction
-        (((00link Pop)) (Jump (conds ()) (default (JumpToRegister 00link)))))))
-     (registers (.ret 00link a b c d x)))
+        ((00link (Set (Add (Register 00pc) (Num 1))))
+         (00pc (Set (LabelLineNumber func)))))
+       Exit))
+     (info ()))
+    |}]
+
+let%expect_test "return compiles correctly" =
+  let prog : Register_stack_instrs.t =
+    let open Register_stack_instrs in
+    [
+      {
+        label = Label.of_string "return_test";
+        body = [];
+        control_flow = Return (Register (Register.of_string "b"));
+      };
+    ]
+  in
+  prog |> Pass_explicit_program_counter.compile
+  |> Desmos_virtual_machine.sexp_of_t sexp_of_unit
+  |> print_s;
+  [%expect
+    {|
+    ((main
+      ((Label return_test)
+       (Instruction ((00ret (Set (Register b))) (00pc (Set (Register 00link)))))))
+     (info ()))
     |}]

@@ -3,50 +3,6 @@ open! Languages
 open! Types
 module Rset = Register.Set
 
-let rec uncover_register_expr = function
-  | Register_func_instrs.Register r -> Rset.singleton r
-  | Num _ | Bool _ -> Rset.empty
-  | Add (a, b)
-  | Sub (a, b)
-  | Mult (a, b)
-  | Div (a, b)
-  | And (a, b)
-  | Or (a, b)
-  | Mod (a, b)
-  | Compare (_, a, b) ->
-      Set.union (uncover_register_expr a) (uncover_register_expr b)
-  | Not e -> uncover_register_expr e
-
-(* TODO brady: move the uncover functions to another pass that just pulls out all registers (and maybe function deps or other things we care about for this pass). It should also have error checking that we don't use a register before defining it. *)
-let uncover_registers_stmt = function
-  | Register_func_instrs.Set (reg, expr) ->
-      Set.union (Rset.singleton reg) (uncover_register_expr expr)
-  | Jump { conds; default = _ } ->
-      conds |> List.map ~f:fst
-      |> List.map ~f:uncover_register_expr
-      |> List.fold ~f:Set.union ~init:Rset.empty
-  | Call { func_name = _; args; ret } ->
-      let args_regs =
-        args
-        |> List.map ~f:uncover_register_expr
-        |> List.fold ~f:Set.union ~init:Rset.empty
-      in
-      let ret_regs =
-        Option.value_map ret ~default:Rset.empty ~f:Rset.singleton
-      in
-      Set.union args_regs ret_regs
-  | Return expr -> uncover_register_expr expr
-
-let uncover_registers_func (def : Register_func_instrs.function_def) =
-  let params_regs = Rset.of_list def.params in
-  let body_regs =
-    def.blocks
-    |> List.concat_map ~f:(fun b -> b.Register_func_instrs.body)
-    |> List.map ~f:uncover_registers_stmt
-    |> List.fold ~f:Set.union ~init:Rset.empty
-  in
-  Set.union params_regs body_regs
-
 let rec compile_expr = function
   | Register_func_instrs.Register r -> Register_stack_instrs.Register r
   | Num n -> Num n
@@ -59,112 +15,103 @@ let rec compile_expr = function
   | Or (a, b) -> Or (compile_expr a, compile_expr b)
   | Not e -> Not (compile_expr e)
   | Mod (a, b) -> Mod (compile_expr a, compile_expr b)
-  | Compare (op, a, b) -> Compare (op, compile_expr a, compile_expr b)
+  | If_expr { conds; default } ->
+      Register_stack_instrs.If_expr
+        {
+          conds =
+            List.map conds ~f:(fun (cond, e) ->
+                (compile_condition cond, compile_expr e));
+          default = compile_expr default;
+        }
 
-let get_function_label name =
-  let function_str = name |> Function_name.to_string in
-  Label.of_string ("function_entrypoint_" ^ function_str)
+and compile_condition = function
+  | Register_func_instrs.Compare (op, a, b) ->
+      Register_stack_instrs.Compare (op, compile_expr a, compile_expr b)
+  | BoolVal e -> BoolVal (compile_expr e)
 
-(* TODO brady: right now the live registers are just computed at the function level. A better way would probably be to analyze all the possible registers that could be impacted by a statement and just push the intersection of those with the function registers. I think I will eventually add a pass before this that injects liveness information. *)
-let compile_stmt ~live_registers
-    ~(functions : Register_func_instrs.function_def Function_name.Map.t) =
-  function
-  | Register_func_instrs.Set (reg, expr) ->
+let compile_control_flow = function
+  | Register_func_instrs.Jump { conds; default } ->
+      Register_stack_instrs.Jump
+        {
+          conds =
+            List.map conds ~f:(fun (cond, lbl) -> (compile_condition cond, lbl));
+          default;
+        }
+  | Return expr -> Return (compile_expr expr)
+  | Exit -> Exit
+
+let compile_stmt
+    ~(functions :
+       Register_func_instrs_with_call_liveness.function_def Function_name.Map.t)
+    = function
+  | Register_func_instrs_with_call_liveness.Set (reg, expr) ->
       [
         Register_stack_instrs.GeneralizedSet [ (reg, Set (compile_expr expr)) ];
       ]
-  | Jump { conds; default } ->
-      [
-        Jump
-          {
-            conds =
-              List.map conds ~f:(fun (cond, label) ->
-                  (compile_expr cond, label));
-            default;
-          };
-      ]
-  | Call call_info ->
+  | Call { func_name; args; ret; live_registers } ->
       let open Register_stack_instrs in
-      (* TODO brady: get liveness from prev language *)
       let need_to_save_registers = Rset.of_list live_registers in
-      let arg_registers =
-        let func_info = Map.find_exn functions call_info.func_name in
-        func_info.params
-      in
+      let func_info = Map.find_exn functions func_name in
+      let arg_registers = func_info.params in
       let arg_registers_and_values =
-        call_info.args |> List.map ~f:compile_expr |> List.zip_exn arg_registers
+        args |> List.map ~f:compile_expr |> List.zip_exn arg_registers
       in
       let save_registers_and_set_args =
         let set_args =
           List.map
             ~f:(fun (reg, expr) ->
-              if Set.mem need_to_save_registers reg then
-                (* argument that we also need to save to stack *)
-                (reg, PushAndSet expr)
-              else
-                (* argument that we don't need to save *)
-                (reg, Set expr))
+              if Set.mem need_to_save_registers reg then (reg, PushAndSet expr)
+              else (reg, Set expr))
             arg_registers_and_values
         in
-        (* handle remaining registers that we need to save *)
         let save_remaining_clobbered =
           Set.diff need_to_save_registers (Rset.of_list arg_registers)
           |> Set.to_list
           |> List.map ~f:(fun r -> (r, Push))
         in
-        GeneralizedSet (set_args @ save_remaining_clobbered)
-      in
-      let call_function =
-        Link_push_jump (get_function_label call_info.func_name)
-      in
-      let restore_registers =
+        let save_link_register = (link_register, Push) in
         GeneralizedSet
-          (need_to_save_registers |> Set.to_list
-          |> List.map ~f:(fun r -> (r, Pop)))
+          ([ save_link_register ] @ set_args @ save_remaining_clobbered)
+      in
+      let call_function = JumpLink func_info.entry_label in
+      let restore_registers =
+        let restore_saved_registers =
+          need_to_save_registers |> Set.to_list
+          |> List.map ~f:(fun r -> (r, Pop))
+        in
+        let restore_link_register = (link_register, Pop) in
+        GeneralizedSet (restore_link_register :: restore_saved_registers)
       in
       let store_result =
-        call_info.ret
+        ret
         |> Option.map ~f:(fun reg ->
                GeneralizedSet [ (reg, Set (Register return_register)) ])
         |> Option.to_list
       in
       [ save_registers_and_set_args; call_function; restore_registers ]
       @ store_result
-  | Return expr ->
-      (* put return value in the correct register, then Link_pop_jump *)
-      [
-        GeneralizedSet
-          [ (Register_stack_instrs.return_register, Set (compile_expr expr)) ];
-        Link_pop_jump;
-      ]
 
-let compile_function_def ~functions (name, def) =
-  let live_registers = uncover_registers_func def |> Set.to_list in
-  List.mapi def.blocks ~f:(fun i block ->
-    let label = if i = 0 then get_function_label name else block.Register_func_instrs.label in
-    { Register_stack_instrs.label;
-      body = List.concat_map block.body ~f:(compile_stmt ~live_registers ~functions) })
+let compile_function_def ~functions (_name, def) =
+  List.map def.Register_func_instrs_with_call_liveness.blocks ~f:(fun block ->
+      {
+        Register_stack_instrs.label =
+          block.Register_func_instrs_with_call_liveness.label;
+        body = List.concat_map block.body ~f:(compile_stmt ~functions);
+        control_flow = compile_control_flow block.control_flow;
+      })
 
-let compile_main ~functions ~main =
-  let live_registers =
-    main
-    |> List.concat_map ~f:(fun b -> b.Register_func_instrs.body)
-    |> List.map ~f:uncover_registers_stmt
-    |> Rset.union_list |> Set.to_list
-  in
-  let compiled =
+let compile { Register_func_instrs_with_call_liveness.functions; main } =
+  let main_blocks =
     List.map main ~f:(fun block ->
-      { Register_stack_instrs.label = block.Register_func_instrs.label;
-        body = List.concat_map block.body ~f:(compile_stmt ~live_registers ~functions) })
+        {
+          Register_stack_instrs.label = block.label;
+          body = List.concat_map block.body ~f:(compile_stmt ~functions);
+          control_flow = compile_control_flow block.control_flow;
+        })
   in
-  match List.rev compiled with
-  | [] -> []
-  | last :: rest_rev ->
-      List.rev rest_rev
-      @ [ { last with body = last.body @ [ Register_stack_instrs.Exit ] } ]
-
-let compile { Register_func_instrs.functions; main } =
-  (* need to put main first because the program starts at the beginning *)
-  compile_main ~functions ~main
-  @ (functions |> Map.to_alist
-    |> List.concat_map ~f:(compile_function_def ~functions))
+  let function_blocks =
+    Map.to_alist functions
+    |> List.concat_map ~f:(fun (name, def) ->
+           compile_function_def ~functions (name, def))
+  in
+  main_blocks @ function_blocks

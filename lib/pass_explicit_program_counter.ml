@@ -16,7 +16,20 @@ let rec compile_expr : Register_stack_instrs.expr -> Desmos_virtual_machine.expr
   | Or (a, b) -> Or (compile_expr a, compile_expr b)
   | Not e -> Not (compile_expr e)
   | Mod (a, b) -> Mod (compile_expr a, compile_expr b)
+  | If_expr { conds; default } ->
+      If_expr
+        {
+          conds =
+            List.map conds ~f:(fun (cond, e) ->
+                (compile_condition cond, compile_expr e));
+          default = compile_expr default;
+        }
+
+and compile_condition :
+    Register_stack_instrs.condition -> Desmos_virtual_machine.condition =
+  function
   | Compare (op, a, b) -> Compare (op, compile_expr a, compile_expr b)
+  | BoolVal e -> BoolVal (compile_expr e)
 
 let compile_generalized_set_action = function
   | Register_stack_instrs.Set expr -> Set (compile_expr expr)
@@ -24,85 +37,54 @@ let compile_generalized_set_action = function
   | Push -> Push
   | Pop -> Pop
 
-let compile_stmt = function
+let compile_body_stmt = function
   | Register_stack_instrs.GeneralizedSet set_actions ->
       let sets =
         List.map set_actions ~f:(fun (reg, action) ->
             (reg, compile_generalized_set_action action))
       in
-      Instruction (sets, NextInstr)
-  | Jump { conds; default } ->
-      let conds =
-        List.map conds ~f:(fun (expr, lbl) ->
-            (compile_expr expr, JumpToLabel lbl))
-      in
-      Instruction ([], Jump { conds; default = JumpToLabel default })
-  | Link_push_jump lbl ->
-      (* TODO brady: If we made this push a label instead then we could jump
-       to something like (link_register, PushAndSet (LabelVal lbl)). maybe
-       this would be better? *)
       Instruction
-        ( [ (link_register, PushAndSet (Add (ProgramCounter, Num 1.))) ],
-          Jump { conds = []; default = JumpToLabel lbl } )
-  | Link_pop_jump ->
+        ((program_counter_reg, Set (Add (Register program_counter_reg, Num 1.)))
+        :: sets)
+  | JumpLink lbl ->
       Instruction
-        ( [ (link_register, Pop) ],
-          Jump { conds = []; default = JumpToRegister link_register } )
-  | Exit -> Instruction ([], Desmos_virtual_machine.Exit)
+        [
+          (link_register, Set (Add (Register program_counter_reg, Num 1.)));
+          (program_counter_reg, Set (LabelLineNumber lbl));
+        ]
 
-let compile_main (blocks : Register_stack_instrs.block list) =
-  List.concat_map blocks ~f:(fun block ->
-    Desmos_virtual_machine.Label block.label
-    :: List.map block.body ~f:compile_stmt)
-
-let rec registers_in_expr = function
-  | Register r -> Register.Set.singleton r
-  | ProgramCounter | Num _ | Bool _ -> Register.Set.empty
-  | Add (a, b)
-  | Sub (a, b)
-  | Mult (a, b)
-  | Div (a, b)
-  | And (a, b)
-  | Or (a, b)
-  | Mod (a, b)
-  | Compare (_, a, b) ->
-      Set.union (registers_in_expr a) (registers_in_expr b)
-  | Not e -> registers_in_expr e
-
-let registers_in_jump_target = function
-  | JumpToRegister r -> Register.Set.singleton r
-  | JumpToLabel _ -> Register.Set.empty
-
-let registers_in_pc_action = function
-  | NextInstr -> Register.Set.empty
-  | Jump { conds; default } ->
-      let cond_regs =
-        List.map conds ~f:(fun (expr, target) ->
-            Set.union (registers_in_expr expr) (registers_in_jump_target target))
-        |> Register.Set.union_list
+let compile_control_flow = function
+  | Register_stack_instrs.Jump { conds; default } ->
+      let compiled_conds =
+        List.map conds ~f:(fun (cond, lbl) ->
+            (compile_condition cond, LabelLineNumber lbl))
       in
-      Set.union cond_regs (registers_in_jump_target default)
-  | Exit -> Register.Set.empty
+      Instruction
+        [
+          ( program_counter_reg,
+            Set
+              (If_expr
+                 { conds = compiled_conds; default = LabelLineNumber default })
+          );
+        ]
+  | Return expr ->
+      Instruction
+        [
+          (return_register, Set (compile_expr expr));
+          (program_counter_reg, Set (Register link_register));
+        ]
+  | Exit -> Desmos_virtual_machine.Exit
 
-let registers_in_stmt = function
-  | Label _ -> Register.Set.empty
-  | Instruction (sets, pc_action) ->
-      let set_regs =
-        List.map sets ~f:(fun (reg, action) ->
-            let expr_regs =
-              match action with
-              | Set expr | PushAndSet expr -> registers_in_expr expr
-              | Push | Pop -> Register.Set.empty
-            in
-            Set.add expr_regs reg)
-        |> Register.Set.union_list
-      in
-      Set.union set_regs (registers_in_pc_action pc_action)
+let compile_block block =
+  let label = Desmos_virtual_machine.Label block.Register_stack_instrs.label in
+  let body = List.map block.Register_stack_instrs.body ~f:compile_body_stmt in
+  let control_flow =
+    compile_control_flow block.Register_stack_instrs.control_flow
+  in
+  [ label ] @ body @ [ control_flow ]
 
-let extract_registers stmts =
-  List.map stmts ~f:registers_in_stmt |> Register.Set.union_list
-
-let compile program =
-  let main = compile_main program in
-  let registers = extract_registers main in
-  { Desmos_virtual_machine.main; registers }
+let compile (blocks : Register_stack_instrs.t) =
+  {
+    Desmos_virtual_machine.main = List.concat_map blocks ~f:compile_block;
+    info = ();
+  }

@@ -1,12 +1,14 @@
 open! Core
 open Types
 
+let link_register = Register.of_string "00link"
+let program_counter_reg = Register.of_string "00pc"
+let return_register = Register.of_string "00ret"
+
 (** Register-based instruction set that allows for function definitions. Don't
     need to worry about saving registers when calling/returning from functions.
 *)
 module Register_func_instrs = struct
-  let entry_label = Label.of_string ".main"
-
   type expr =
     | Register of Register.t
     | Num of float
@@ -19,37 +21,81 @@ module Register_func_instrs = struct
     | Or of expr * expr
     | Not of expr
     | Mod of expr * expr
-    | Compare of Compare_op.t * expr * expr
+    | If_expr of { conds : (condition * expr) list; default : expr }
+  [@@deriving sexp]
+
+  and condition = Compare of Compare_op.t * expr * expr | BoolVal of expr
   [@@deriving sexp]
 
   type stmt =
     | Set of Register.t * expr
-    | Jump of { conds : (expr * Label.t) list; default : Label.t }
     | Call of {
         func_name : Function_name.t;
         args : expr list;
         ret : Register.t option;
       }
-    | Return of expr
   [@@deriving sexp]
 
-  type block = { label : Label.t; body : stmt list } [@@deriving sexp]
+  type control_flow =
+    | Jump of { conds : (condition * Label.t) list; default : Label.t }
+    | Return of expr
+    | Exit
+  [@@deriving sexp]
 
-  type function_def = { params : Register.t list; blocks : block list }
+  type block = {
+    label : Label.t;
+    body : stmt list;
+    control_flow : control_flow;
+  }
+  [@@deriving sexp]
+
+  type function_def = {
+    entry_label : Label.t;
+    params : Register.t list;
+    blocks : block list;
+  }
   [@@deriving sexp]
 
   type t = { functions : function_def Function_name.Map.t; main : block list }
   [@@deriving sexp]
 end
 
-module Register_func_instrs_with_liveness = struct end
+module Register_func_instrs_with_call_liveness = struct
+  type expr = Register_func_instrs.expr [@@deriving sexp]
+  type control_flow = Register_func_instrs.control_flow [@@deriving sexp]
+
+  type stmt =
+    | Set of Register.t * expr
+    | Call of {
+        func_name : Function_name.t;
+        args : expr list;
+        ret : Register.t option;
+        live_registers : Register.t list;
+      }
+  [@@deriving sexp]
+
+  type block = {
+    label : Label.t;
+    body : stmt list;
+    control_flow : control_flow;
+  }
+  [@@deriving sexp]
+
+  type function_def = {
+    entry_label : Label.t;
+    params : Register.t list;
+    blocks : block list;
+  }
+  [@@deriving sexp]
+
+  type t = { functions : function_def Function_name.Map.t; main : block list }
+  [@@deriving sexp]
+end
 
 (** Register-based instruction set that has a per-register stack (instead of
     functions). *)
 module Register_stack_instrs = struct
   (* TODO brady: maybe make this per-function? *)
-  let return_register = Register.of_string "00ret"
-  let entry_label = Label.of_string ".main"
 
   type expr =
     | Register of Register.t
@@ -63,36 +109,47 @@ module Register_stack_instrs = struct
     | Or of expr * expr
     | Not of expr
     | Mod of expr * expr
-    | Compare of Compare_op.t * expr * expr
+    | If_expr of { conds : (condition * expr) list; default : expr }
   [@@deriving sexp]
 
+  and condition = Compare of Compare_op.t * expr * expr | BoolVal of expr
+  [@@deriving sexp]
+
+  (* TODO brady: pushandset is unneeded, we can just have a push and a set *)
   type generalized_set_action = Set of expr | PushAndSet of expr | Push | Pop
   [@@deriving sexp]
 
   type stmt =
-    | Jump of { conds : (expr * Label.t) list; default : Label.t }
     | GeneralizedSet of (Register.t * generalized_set_action) list
-      (* push old values to the stack, and set new values using expression computed with the old values  *)
-    | Link_push_jump of Label.t
-      (* call to Link_pop_jump will go to the next line. jump to label *)
-    | Link_pop_jump
+    (* push old values to the stack, and set new values using expression computed with the old values  *)
+    (* this is a statement instead of control flow because we know we are coming back. *)
+    | JumpLink of Label.t
+  [@@deriving sexp]
+
+  type control_flow =
+    | Jump of { conds : (condition * Label.t) list; default : Label.t }
+    | Return of expr
     | Exit
   [@@deriving sexp]
 
-  type block = { label : Label.t; body : stmt list } [@@deriving sexp]
+  type block = {
+    label : Label.t;
+    body : stmt list;
+    control_flow : control_flow;
+  }
+  [@@deriving sexp]
+
   type t = block list [@@deriving sexp]
 end
 
-(** Register-based instruction set that allows for calling any number of
-    statements at a time. At any given time a register can be modified at most
-    once, and reads of the register will be from before the modification. The
-    program counter update is also explicit in this instruction set. *)
+(** Register-based instruction set where each instruction is a list of register
+    sets that execute simultaneously. Jumps are expressed by setting
+    program_counter_reg explicitly. Labels are resolved to line numbers by the
+    next pass via LabelLineNumber. *)
 module Desmos_virtual_machine = struct
-  let link_register = Register.of_string "00link"
-
   type expr =
     | Register of Register.t
-    | ProgramCounter
+    | LabelLineNumber of Label.t
     | Num of float
     | Bool of bool
     | Add of expr * expr
@@ -103,28 +160,22 @@ module Desmos_virtual_machine = struct
     | Or of expr * expr
     | Not of expr
     | Mod of expr * expr
-    | Compare of Compare_op.t * expr * expr
+    | If_expr of { conds : (condition * expr) list; default : expr }
+  [@@deriving sexp]
+
+  and condition = Compare of Compare_op.t * expr * expr | BoolVal of expr
   [@@deriving sexp]
 
   type generalized_set = Set of expr | PushAndSet of expr | Push | Pop
   [@@deriving sexp]
 
-  (* TODO brady: for better optimization might need specially handle function calls instead of allowing general registers? *)
-  type jump_target = JumpToLabel of Label.t | JumpToRegister of Register.t
-  [@@deriving sexp]
-
-  type pc_action =
-    | NextInstr
-    | Jump of { conds : (expr * jump_target) list; default : jump_target }
+  type stmt =
+    | Instruction of (Register.t * generalized_set) list
+    | Label of Label.t
     | Exit
   [@@deriving sexp]
 
-  type instruction = (Register.t * generalized_set) list * pc_action
-  [@@deriving sexp]
-
-  (* TODO brady: maybe consider grouping by labels instead of integrating them with the code? this would need to start at an earlier language. Then each group would be defined by (stmt list, jump). Honestly this could make things a lot nicer. *)
-  type stmt = Label of Label.t | Instruction of instruction [@@deriving sexp]
-  type t = { main : stmt list; registers : Register.Set.t } [@@deriving sexp]
+  type 'a t = { main : stmt list; info : 'a } [@@deriving sexp]
 end
 
 (** The output to desmos, including the runtime environment necessary to execute
@@ -134,7 +185,6 @@ module Desmos_output = struct
 
   type expr =
     | Register of Register.t
-    | ProgramCounter
     | Num of float
     | Add of expr * expr
     | Sub of expr * expr
@@ -186,7 +236,6 @@ module Desmos_output = struct
     in
     function
     | Register reg -> latex_of_register reg
-    | ProgramCounter -> latex_of_register program_counter_reg
     | Num n ->
         let n_str = Float.to_string n in
         String.chop_suffix_if_exists n_str ~suffix:"."
