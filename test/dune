@@ -1,6 +1,8 @@
 (library
  (name test_desmos_compiler)
- (inline_tests)
+ (inline_tests
+  (deps
+   (glob_files programs/*.sexp)))
  (libraries desmos_compiler core)
  (preprocess
   (pps ppx_jane)))

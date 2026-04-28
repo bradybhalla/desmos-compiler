@@ -19,6 +19,9 @@ need to be careful about
 maybe the best way to do it is just fully expand any expression
 that isn't pure
 
+
+TODO: also want to make short circuiting with And/Or explicit. if needed they should be turned into new if statements.
+
  *)
 
 (* NOTE: this is just temporary error checking code that doesn't do the expected thing*)
@@ -32,7 +35,8 @@ let rec expr_has_call : expr -> bool = function
   | Div (a, b)
   | And (a, b)
   | Or (a, b)
-  | Mod (a, b) ->
+  | Mod (a, b)
+  | Compare (_, a, b) ->
       expr_has_call a || expr_has_call b
   | Not e -> expr_has_call e
   | If_expr { conds; default } ->
@@ -54,8 +58,8 @@ let rec check_stmt = function
   | While (cond, body) ->
       check_expr_no_calls cond;
       List.iter body ~f:check_stmt
-  | If { conds; default } ->
-      (match conds with
+  | If { branches; else_ } ->
+      (match branches with
       | [] -> ()
       | (_, first_body) :: rest ->
           (* First condition may have calls — only check its body stmts *)
@@ -64,7 +68,7 @@ let rec check_stmt = function
           List.iter rest ~f:(fun (cond, body) ->
               check_expr_no_calls cond;
               List.iter body ~f:check_stmt));
-      List.iter default ~f:check_stmt
+      List.iter else_ ~f:check_stmt
 
 let compile (program : t) : t =
   List.iter program ~f:check_stmt;
