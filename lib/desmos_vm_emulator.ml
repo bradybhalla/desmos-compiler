@@ -27,7 +27,8 @@ let evaluate_initial_register_value = function
   | Mod (_, _)
   | And (_, _)
   | Or (_, _)
-  | Not _ | Register _ | LabelLineNumber _ | If_expr _ ->
+  | Not _ | Register _ | LabelLineNumber _ | If_expr _
+  | Compare (_, _, _) ->
       failwith "initial expression should be a constant"
 
 let create program =
@@ -78,18 +79,6 @@ let rec eval_expr expr ~t =
   | Not a -> 1. -. eval_expr ~t a
   | Mod (a, b) -> Float.mod_float (eval_expr ~t a) (eval_expr ~t b)
   | LabelLineNumber lbl -> Float.of_int (Map.find_exn t.label_line_lookup lbl)
-  | If_expr { conds; default } ->
-      let rec eval_conds = function
-        | [] -> eval_expr ~t default
-        | (cond, expr) :: rest ->
-            if is_true (eval_cond cond ~t) then eval_expr ~t expr
-            else eval_conds rest
-      in
-      eval_conds conds
-
-and eval_cond cond ~t =
-  match cond with
-  | BoolVal e -> eval_expr ~t e
   | Compare (op, a, b) ->
       let a = eval_expr ~t a in
       let b = eval_expr ~t b in
@@ -103,6 +92,14 @@ and eval_cond cond ~t =
         | Ne -> not (a ==. b)
       in
       if result then 1. else 0.
+  | If_expr { conds; default } ->
+      let rec eval_conds = function
+        | [] -> eval_expr ~t default
+        | (cond, expr) :: rest ->
+            if is_true (eval_expr ~t cond) then eval_expr ~t expr
+            else eval_conds rest
+      in
+      eval_conds conds
 
 let step t =
   match Array.get t.instrs t.program_counter with

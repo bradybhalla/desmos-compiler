@@ -15,18 +15,15 @@ let rec compile_expr = function
   | Or (a, b) -> Or (compile_expr a, compile_expr b)
   | Not e -> Not (compile_expr e)
   | Mod (a, b) -> Mod (compile_expr a, compile_expr b)
+  | Compare (op, a, b) -> Compare (op, compile_expr a, compile_expr b)
   | If_expr { conds; default } ->
       If_expr
         {
           conds =
             List.map conds ~f:(fun (cond, e) ->
-                (compile_condition cond, compile_expr e));
+                (compile_expr cond, compile_expr e));
           default = compile_expr default;
         }
-
-and compile_condition = function
-  | Compare (op, a, b) -> Compare (op, compile_expr a, compile_expr b)
-  | BoolVal e -> BoolVal (compile_expr e)
 
 let compile_generalized_set_action = function
   | Register_stack_instrs.Set expr -> Set (compile_expr expr)
@@ -54,7 +51,7 @@ let compile_control_flow = function
   | Register_stack_instrs.Jump { conds; default } ->
       let compiled_conds =
         List.map conds ~f:(fun (cond, lbl) ->
-            (compile_condition cond, LabelLineNumber lbl))
+            (compile_expr cond, LabelLineNumber lbl))
       in
       Instruction
         [

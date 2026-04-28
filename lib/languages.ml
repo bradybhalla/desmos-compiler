@@ -5,8 +5,18 @@ let link_register = Register.of_string "00link"
 let program_counter_reg = Register.of_string "00pc"
 let return_register = Register.of_string "00ret"
 
+(* TODO brady: after lists exist, it would be nice to have a "for" construct
+   over a range.
+
+   (for i (1..5)
+      (set j (/ i 2))
+      (update j))
+
+   *)
+
 module C_style_frontend = struct
   type expr =
+    | Unit
     | Register of Register.t
     | Num of float
     | Bool of bool
@@ -19,37 +29,59 @@ module C_style_frontend = struct
     | Not of expr
     | Mod of expr * expr
     | If_expr of { conds : (expr * expr) list; default : expr }
+    | Call of Function_name.t * expr list
   [@@deriving sexp]
 
   type stmt =
-    | Function_def of unit
-    | If of expr * stmt list * stmt list
+    | Function_def of Function_name.t * Register.t list * stmt list
+    | Return of expr
+    | If of { branches : (expr * stmt list) list; else_ : stmt list }
     | Set of Register.t * expr
     | While of expr * stmt list
+    | Call of Function_name.t * expr list
   [@@deriving sexp]
+
+  type t = stmt list [@@deriving sexp]
 end
 
-(*
-(def f (a b c)
-  (if (a > b) (
-    (set x 1)
-    (set y 2)
-    (set z 12)
-  ) else (
-    (set x 1)
-    (set y 1)
-  ))
-
-
-)
-
- *)
-
 (* if the conditions are pure then you can do can put them all in a list. if they have function calls in them then they need to be nested  *)
-module C_style_parsed_conditionals = struct end
+module C_style_separated_functions = struct
+  type expr =
+    | Unit
+    | Register of Register.t
+    | Num of float
+    | Bool of bool
+    | Add of expr * expr
+    | Sub of expr * expr
+    | Mult of expr * expr
+    | Div of expr * expr
+    | And of expr * expr
+    | Or of expr * expr
+    | Not of expr
+    | Mod of expr * expr
+    | Compare of Compare_op.t * expr * expr
+    | If_expr of { conds : (expr * expr) list; default : expr }
+  [@@deriving sexp]
 
-(* similar to previous but has functions separated and doesn't allow for calls inside of complex statements *)
-module C_style_extracted_functions = struct end
+  type stmt =
+    | Return of expr
+    | If of { branches : (expr * stmt list) list; else_ : stmt list }
+    | Set of Register.t * expr
+    (* we need to keep any statements needed for the while loop condition so we can put it in the correct place later *)
+    | While of { cond : stmt list * expr; body : stmt list }
+    | Call of {
+        func_name : Function_name.t;
+        args : expr list;
+        ret : Register.t option;
+      }
+  [@@deriving sexp]
+
+  type function_def = { params : Register.t list; body : stmt list }
+  [@@deriving sexp]
+
+  type t = { functions : function_def Function_name.Map.t; main : stmt list }
+  [@@deriving sexp]
+end
 
 (** Register-based instruction set that allows for function definitions. Don't
     need to worry about saving registers when calling/returning from functions.
@@ -67,10 +99,8 @@ module Register_func_instrs = struct
     | Or of expr * expr
     | Not of expr
     | Mod of expr * expr
-    | If_expr of { conds : (condition * expr) list; default : expr }
-  [@@deriving sexp]
-
-  and condition = Compare of Compare_op.t * expr * expr | BoolVal of expr
+    | Compare of Compare_op.t * expr * expr
+    | If_expr of { conds : (expr * expr) list; default : expr }
   [@@deriving sexp]
 
   type stmt =
@@ -83,7 +113,7 @@ module Register_func_instrs = struct
   [@@deriving sexp]
 
   type control_flow =
-    | Jump of { conds : (condition * Label.t) list; default : Label.t }
+    | Jump of { conds : (expr * Label.t) list; default : Label.t }
     | Return of expr
     | Exit
   [@@deriving sexp]
@@ -159,10 +189,8 @@ module Register_stack_instrs = struct
     | Or of expr * expr
     | Not of expr
     | Mod of expr * expr
-    | If_expr of { conds : (condition * expr) list; default : expr }
-  [@@deriving sexp]
-
-  and condition = Compare of Compare_op.t * expr * expr | BoolVal of expr
+    | Compare of Compare_op.t * expr * expr
+    | If_expr of { conds : (expr * expr) list; default : expr }
   [@@deriving sexp]
 
   (* TODO brady: pushandset is unneeded, we can just have a push and a set *)
@@ -180,7 +208,7 @@ module Register_stack_instrs = struct
   [@@deriving sexp]
 
   type control_flow =
-    | Jump of { conds : (condition * Label.t) list; default : Label.t }
+    | Jump of { conds : (expr * Label.t) list; default : Label.t }
     | Return of expr
     | Exit
   [@@deriving sexp]
@@ -213,10 +241,8 @@ module Desmos_virtual_machine = struct
     | Or of expr * expr
     | Not of expr
     | Mod of expr * expr
-    | If_expr of { conds : (condition * expr) list; default : expr }
-  [@@deriving sexp]
-
-  and condition = Compare of Compare_op.t * expr * expr | BoolVal of expr
+    | Compare of Compare_op.t * expr * expr
+    | If_expr of { conds : (expr * expr) list; default : expr }
   [@@deriving sexp]
 
   type generalized_set_action = Set of expr | PushAndSet of expr | Push | Pop
@@ -259,8 +285,7 @@ module Desmos_output = struct
     | ListLiteral of expr list
   [@@deriving sexp]
 
-  and condition = Compare of Compare_op.t * expr * expr | BoolVal of expr
-  [@@deriving sexp]
+  and condition = Compare_op.t * expr * expr [@@deriving sexp]
 
   type set = Register.t * expr [@@deriving sexp]
 
@@ -333,20 +358,17 @@ module Desmos_output = struct
             String.concat ~sep:", " conds_latex ^ ", " ^ latex_of_expr default
             |> latex_wrap_lr "\\{" "\\}")
 
-  and latex_of_cond = function
-    | Compare (op, a, b) -> (
-        let a_latex = latex_of_expr a in
-        let b_latex = latex_of_expr b in
-        match op with
-        | Eq -> a_latex ^ " = " ^ b_latex
-        (* TODO brady: do != in an easy way *)
-        | Ne -> failwith "TODO"
-        | Gt -> a_latex ^ " > " ^ b_latex
-        | Ge -> a_latex ^ " \\ge " ^ b_latex
-        | Lt -> a_latex ^ " < " ^ b_latex
-        | Le -> a_latex ^ " \\le " ^ b_latex)
-    (* booleans are either 1 or 0 *)
-    | BoolVal v -> latex_of_cond (Compare (Eq, v, Num 1.))
+  and latex_of_cond (op, a, b) =
+    let a_latex = latex_of_expr a in
+    let b_latex = latex_of_expr b in
+    match op with
+    | Compare_op.Eq -> a_latex ^ " = " ^ b_latex
+    (* TODO brady: do != in an easy way *)
+    | Ne -> failwith "TODO"
+    | Gt -> a_latex ^ " > " ^ b_latex
+    | Ge -> a_latex ^ " \\ge " ^ b_latex
+    | Lt -> a_latex ^ " < " ^ b_latex
+    | Le -> a_latex ^ " \\le " ^ b_latex
 
   let latex_of_set (reg, expr) =
     latex_of_register reg ^ "\\to " ^ latex_of_expr expr

@@ -12,11 +12,14 @@ let build_label_map blocks =
   in
   label_map
 
+let true_lit = Num 1.
+let false_lit = Num 0.
+
 let rec compile_expr label_map = function
   | Desmos_virtual_machine.Register r -> Register r
   | LabelLineNumber lbl -> Num (Float.of_int (Map.find_exn label_map lbl))
   | Num n -> Num n
-  | Bool b -> Num (if b then 1. else 0.)
+  | Bool b -> if b then true_lit else false_lit
   | Add (a, b) -> Add (compile_expr label_map a, compile_expr label_map b)
   | Sub (a, b) -> Sub (compile_expr label_map a, compile_expr label_map b)
   | Mult (a, b) -> Mult (compile_expr label_map a, compile_expr label_map b)
@@ -25,19 +28,28 @@ let rec compile_expr label_map = function
   | Or (a, b) -> Or (compile_expr label_map a, compile_expr label_map b)
   | Not e -> Not (compile_expr label_map e)
   | Mod (a, b) -> Mod (compile_expr label_map a, compile_expr label_map b)
+  | Compare (op, a, b) ->
+      If_expr
+        {
+          conds =
+            [ ((op, compile_expr label_map a, compile_expr label_map b), true_lit) ];
+          default = false_lit;
+        }
   | If_expr { conds; default } ->
       If_expr
         {
           conds =
-            List.map conds ~f:(fun (cond, expr) ->
-                (compile_condition label_map cond, compile_expr label_map expr));
+            List.map conds ~f:(fun (cond_expr, expr) ->
+                let cond =
+                  match cond_expr with
+                  | Desmos_virtual_machine.Compare (op, a, b) ->
+                      (op, compile_expr label_map a, compile_expr label_map b)
+                  | _ ->
+                      (Compare_op.Eq, compile_expr label_map cond_expr, Num 1.)
+                in
+                (cond, compile_expr label_map expr));
           default = compile_expr label_map default;
         }
-
-and compile_condition label_map = function
-  | Desmos_virtual_machine.Compare (op, a, b) ->
-      Compare (op, compile_expr label_map a, compile_expr label_map b)
-  | BoolVal e -> BoolVal (compile_expr label_map e)
 
 let compile_generalized_set reg action label_map : set list =
   let stack_reg = get_stack_register reg in
@@ -61,7 +73,7 @@ let compile_generalized_set reg action label_map : set list =
 
 let compile_stmt label_map idx stmt =
   let pc_eq_i =
-    Compare (Compare_op.Eq, Register program_counter_reg, Num (Float.of_int idx))
+    (Compare_op.Eq, Register program_counter_reg, Num (Float.of_int idx))
   in
   match stmt with
   | Desmos_virtual_machine.Exit ->

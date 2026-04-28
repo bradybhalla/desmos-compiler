@@ -14,28 +14,24 @@ let rec uncover_register_expr = function
   | Div (a, b)
   | And (a, b)
   | Or (a, b)
-  | Mod (a, b) ->
+  | Mod (a, b)
+  | Compare (_, a, b) ->
       Set.union (uncover_register_expr a) (uncover_register_expr b)
   | Not e -> uncover_register_expr e
   | If_expr { conds; default } ->
       let cond_regs =
         List.map conds ~f:(fun (cond, e) ->
             Set.union
-              (uncover_register_condition cond)
+              (uncover_register_expr cond)
               (uncover_register_expr e))
         |> Register.Set.union_list
       in
       Set.union cond_regs (uncover_register_expr default)
 
-and uncover_register_condition = function
-  | Register_func_instrs.Compare (_, a, b) ->
-      Set.union (uncover_register_expr a) (uncover_register_expr b)
-  | BoolVal e -> uncover_register_expr e
-
 let uncover_registers_control_flow = function
   | Register_func_instrs.Jump { conds; default = _ } ->
       conds
-      |> List.map ~f:(fun (cond, _) -> uncover_register_condition cond)
+      |> List.map ~f:(fun (cond, _) -> uncover_register_expr cond)
       |> List.fold ~f:Set.union ~init:Rset.empty
   | Return expr -> uncover_register_expr expr
   | Exit -> Rset.empty

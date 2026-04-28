@@ -15,20 +15,17 @@ let rec registers_in_expr = function
   | Div (a, b)
   | And (a, b)
   | Or (a, b)
-  | Mod (a, b) ->
+  | Mod (a, b)
+  | Compare (_, a, b) ->
       Set.union (registers_in_expr a) (registers_in_expr b)
   | Not e -> registers_in_expr e
   | If_expr { conds; default } ->
       let cond_regs =
         List.map conds ~f:(fun (cond, expr) ->
-            Set.union (registers_in_condition cond) (registers_in_expr expr))
+            Set.union (registers_in_expr cond) (registers_in_expr expr))
         |> Register.Set.union_list
       in
       Set.union cond_regs (registers_in_expr default)
-
-and registers_in_condition = function
-  | Compare (_, a, b) -> Set.union (registers_in_expr a) (registers_in_expr b)
-  | BoolVal e -> registers_in_expr e
 
 let registers_in_stmt = function
   | Exit -> Register.Set.empty

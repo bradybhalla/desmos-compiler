@@ -53,9 +53,9 @@ let%expect_test "multiple instructions" =
     {|
     ((program_action
       ((conds
-        (((Compare Eq (Register 00pc) (Num 0)) ((a (Num 1)) (b (Num 2))))
-         ((Compare Eq (Register 00pc) (Num 1)) ((a (Register a))))
-         ((Compare Eq (Register 00pc) (Num 2)) ((00pc (Num -1))))))
+        (((Eq (Register 00pc) (Num 0)) ((a (Num 1)) (b (Num 2))))
+         ((Eq (Register 00pc) (Num 1)) ((a (Register a))))
+         ((Eq (Register 00pc) (Num 2)) ((00pc (Num -1))))))
        (default ((00pc (Register 00pc))))))
      (init_registers
       ((00pc (Num 0)) (00pcStack (ListLiteral ((Num 5.4321)))) (a (Num 0))
@@ -109,7 +109,7 @@ let%expect_test "push and pop" =
     {|
     ((program_action
       ((conds
-        (((Compare Eq (Register 00pc) (Num 0))
+        (((Eq (Register 00pc) (Num 0))
           ((aStack (ListJoin (Register aStack) (Register a)))
            (b (ListIndex (Register bStack) (ListLength (Register bStack))))
            (bStack
@@ -117,7 +117,7 @@ let%expect_test "push and pop" =
              (Sub (ListLength (Register bStack)) (Num 1))))
            (c (Num 1)) (dStack (ListJoin (Register dStack) (Register d)))
            (d (Num 1))))
-         ((Compare Eq (Register 00pc) (Num 1)) ((00pc (Num -1))))))
+         ((Eq (Register 00pc) (Num 1)) ((00pc (Num -1))))))
        (default ((00pc (Register 00pc))))))
      (init_registers
       ((00pc (Num 0)) (00pcStack (ListLiteral ((Num 5.4321)))) (a (Num 0))
@@ -175,16 +175,15 @@ let%expect_test "nested if_expr" =
     {|
     ((program_action
       ((conds
-        (((Compare Eq (Register 00pc) (Num 0))
+        (((Eq (Register 00pc) (Num 0))
           ((a
             (If_expr (conds ())
              (default
               (If_expr
                (conds
-                (((Compare Gt (Num 1) (Num 1)) (Num 1))
-                 ((Compare Gt (Num 1) (Num 1)) (Num 2))))
+                (((Gt (Num 1) (Num 1)) (Num 1)) ((Gt (Num 1) (Num 1)) (Num 2))))
                (default (Num 3))))))))
-         ((Compare Eq (Register 00pc) (Num 1)) ((00pc (Num -1))))))
+         ((Eq (Register 00pc) (Num 1)) ((00pc (Num -1))))))
        (default ((00pc (Register 00pc))))))
      (init_registers
       ((00pc (Num 0)) (00pcStack (ListLiteral ((Num 5.4321)))) (a (Num 0))

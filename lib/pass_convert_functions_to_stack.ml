@@ -15,26 +15,22 @@ let rec compile_expr = function
   | Or (a, b) -> Or (compile_expr a, compile_expr b)
   | Not e -> Not (compile_expr e)
   | Mod (a, b) -> Mod (compile_expr a, compile_expr b)
+  | Compare (op, a, b) -> Compare (op, compile_expr a, compile_expr b)
   | If_expr { conds; default } ->
       Register_stack_instrs.If_expr
         {
           conds =
             List.map conds ~f:(fun (cond, e) ->
-                (compile_condition cond, compile_expr e));
+                (compile_expr cond, compile_expr e));
           default = compile_expr default;
         }
-
-and compile_condition = function
-  | Register_func_instrs.Compare (op, a, b) ->
-      Register_stack_instrs.Compare (op, compile_expr a, compile_expr b)
-  | BoolVal e -> BoolVal (compile_expr e)
 
 let compile_control_flow = function
   | Register_func_instrs.Jump { conds; default } ->
       Register_stack_instrs.Jump
         {
           conds =
-            List.map conds ~f:(fun (cond, lbl) -> (compile_condition cond, lbl));
+            List.map conds ~f:(fun (cond, lbl) -> (compile_expr cond, lbl));
           default;
         }
   | Return expr -> Return (compile_expr expr)
