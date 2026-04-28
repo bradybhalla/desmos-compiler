@@ -5,6 +5,52 @@ let link_register = Register.of_string "00link"
 let program_counter_reg = Register.of_string "00pc"
 let return_register = Register.of_string "00ret"
 
+module C_style_frontend = struct
+  type expr =
+    | Register of Register.t
+    | Num of float
+    | Bool of bool
+    | Add of expr * expr
+    | Sub of expr * expr
+    | Mult of expr * expr
+    | Div of expr * expr
+    | And of expr * expr
+    | Or of expr * expr
+    | Not of expr
+    | Mod of expr * expr
+    | If_expr of { conds : (expr * expr) list; default : expr }
+  [@@deriving sexp]
+
+  type stmt =
+    | Function_def of unit
+    | If of expr * stmt list * stmt list
+    | Set of Register.t * expr
+    | While of expr * stmt list
+  [@@deriving sexp]
+end
+
+(*
+(def f (a b c)
+  (if (a > b) (
+    (set x 1)
+    (set y 2)
+    (set z 12)
+  ) else (
+    (set x 1)
+    (set y 1)
+  ))
+
+
+)
+
+ *)
+
+(* if the conditions are pure then you can do can put them all in a list. if they have function calls in them then they need to be nested  *)
+module C_style_parsed_conditionals = struct end
+
+(* similar to previous but has functions separated and doesn't allow for calls inside of complex statements *)
+module C_style_extracted_functions = struct end
+
 (** Register-based instruction set that allows for function definitions. Don't
     need to worry about saving registers when calling/returning from functions.
 *)
@@ -181,6 +227,7 @@ module Desmos_virtual_machine = struct
     maybe we need another intermediate language where there are Instructions
     and ManualPCInstructions? Then we optimize there and have a small pass
     turning it into this language? *)
+  (* TODO brady: this Exit should be able to be represented as PC <- -1 or something, then we don't need a whole instruction *)
   type stmt = Instruction of (Register.t * generalized_set_action) list | Exit
   [@@deriving sexp]
 
