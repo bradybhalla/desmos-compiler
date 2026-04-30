@@ -1,3 +1,164 @@
-(* TODO brady: turn control flow into jumps
- - if
- - while *)
+open! Core
+open! Languages
+open! Types
+
+(* TODO: this pass got kind of complicated because I wanted to have the blocks work a certain way for future optimizations. hopefully it actually works otherwise I made it more annoying than I had to for nothing. *)
+
+(* TODO brady: generator should be wrapped in a module probably *)
+let next_label_id = ref 0
+
+let generate_label str =
+  let res = [%string "label_%{!next_label_id#Int}_%{str}"] in
+  next_label_id := !next_label_id + 1;
+  Label.of_string res
+
+let reset_label_generator () = next_label_id := 0
+
+let rec compile_expr = function
+  | C_style_separated_functions.Unit -> failwith "TODO: unit"
+  | Register reg -> Register_func_instrs.Register reg
+  | Num n -> Num n
+  | Bool b -> Bool b
+  | Add (e1, e2) -> Add (compile_expr e1, compile_expr e2)
+  | Sub (e1, e2) -> Sub (compile_expr e1, compile_expr e2)
+  | Mult (e1, e2) -> Mult (compile_expr e1, compile_expr e2)
+  | Div (e1, e2) -> Div (compile_expr e1, compile_expr e2)
+  | And (e1, e2) -> And (compile_expr e1, compile_expr e2)
+  | Or (e1, e2) -> Or (compile_expr e1, compile_expr e2)
+  | Not e -> Not (compile_expr e)
+  | Mod (e1, e2) -> Mod (compile_expr e1, compile_expr e2)
+  | Compare (op, e1, e2) -> Compare (op, compile_expr e1, compile_expr e2)
+  | If_expr { conds; default } ->
+      If_expr
+        {
+          conds =
+            List.map conds ~f:(fun (cond, result) ->
+                (compile_expr cond, compile_expr result));
+          default = compile_expr default;
+        }
+
+let rec compile_statements ~cur_label ~default_next ~stmts_rev ~blocks_rev =
+  let open Register_func_instrs in
+  function
+  | [] ->
+      let control_flow =
+        Option.value_exn
+          ~message:"control flow statement expected (possibly missing return)"
+          default_next
+      in
+      List.rev
+        ({ label = cur_label; body = List.rev stmts_rev; control_flow }
+        :: blocks_rev)
+  | stmt :: rest -> (
+      match stmt with
+      | C_style_separated_functions.Return expr ->
+          (* TODO: warn if rest is nonempty. however it is not so simple because an early return inside of a while loop is fine. *)
+          List.rev
+            ({
+               label = cur_label;
+               body = List.rev stmts_rev;
+               control_flow = Return (compile_expr expr);
+             }
+            :: blocks_rev)
+      | If { branches; else_ } ->
+          let final_label = generate_label "if_statement_exit" in
+          let branch_conds, branch_blocks =
+            List.map branches ~f:(fun (cond, stmts) ->
+                let cur_label = generate_label "if_statement_branch" in
+                let cond = compile_expr cond in
+                let blocks =
+                  compile_statements ~cur_label
+                    ~default_next:
+                      (Some (Jump { conds = []; default = final_label }))
+                    ~stmts_rev:[] ~blocks_rev:[] stmts
+                in
+                ((cond, cur_label), blocks))
+            |> List.unzip
+          in
+          let else_label, else_blocks =
+            match else_ with
+            | [] -> (final_label, [])
+            | stmts ->
+                let cur_label = generate_label "if_statement_else" in
+                let blocks =
+                  compile_statements ~cur_label
+                    ~default_next:
+                      (Some (Jump { conds = []; default = final_label }))
+                    ~stmts_rev:[] ~blocks_rev:[] stmts
+                in
+                (cur_label, blocks)
+          in
+          let blocks_to_add =
+            [
+              {
+                label = cur_label;
+                body = List.rev stmts_rev;
+                control_flow =
+                  Jump { conds = branch_conds; default = else_label };
+              };
+            ]
+            @ List.concat branch_blocks @ else_blocks
+          in
+          let blocks_rev =
+            List.fold_left
+              ~f:(fun acc block -> block :: acc)
+              ~init:blocks_rev blocks_to_add
+          in
+          compile_statements ~cur_label:final_label ~default_next ~stmts_rev:[]
+            ~blocks_rev rest
+      | While { cond = cond_stmts, cond_expr; body } ->
+          let final_label = generate_label "while_end" in
+          let entry_label = generate_label "while_entry" in
+          let jump =
+            Jump
+              {
+                conds = [ (compile_expr cond_expr, entry_label) ];
+                default = final_label;
+              }
+          in
+          let blocks_before_while =
+            (* statements to prepare condition and then jump  *)
+            compile_statements ~cur_label ~default_next:(Some jump) ~stmts_rev
+              ~blocks_rev:[] cond_stmts
+          in
+          let blocks_while_body =
+            (* while body, prepare condition, and then jump *)
+            compile_statements ~cur_label:entry_label ~default_next:(Some jump)
+              ~stmts_rev:[] ~blocks_rev:[] (body @ cond_stmts)
+          in
+          let blocks_rev =
+            List.fold_left
+              ~f:(fun acc block -> block :: acc)
+              ~init:blocks_rev
+              (blocks_before_while @ blocks_while_body)
+          in
+          compile_statements ~cur_label:final_label ~default_next ~stmts_rev:[]
+            ~blocks_rev rest
+      | Set (reg, expr) ->
+          let stmt = Set (reg, compile_expr expr) in
+          compile_statements ~cur_label ~default_next
+            ~stmts_rev:(stmt :: stmts_rev) ~blocks_rev rest
+      | Call { func_name; args; ret } ->
+          let stmt =
+            Call { func_name; args = List.map ~f:compile_expr args; ret }
+          in
+          compile_statements ~cur_label ~default_next
+            ~stmts_rev:(stmt :: stmts_rev) ~blocks_rev rest)
+
+let compile C_style_separated_functions.{ functions; main } =
+  reset_label_generator ();
+  Register_func_instrs.
+    {
+      functions =
+        Map.map functions ~f:(fun { params; body } ->
+            let entry_label = generate_label "function_entry" in
+            let blocks =
+              compile_statements ~cur_label:entry_label ~default_next:None
+                ~stmts_rev:[] ~blocks_rev:[] body
+            in
+            { entry_label; params; blocks });
+      main =
+        (let entry_label = generate_label "main" in
+         compile_statements ~cur_label:entry_label ~default_next:(Some Exit)
+           ~stmts_rev:[] ~blocks_rev:[] main);
+    }

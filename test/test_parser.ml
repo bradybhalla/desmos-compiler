@@ -4,10 +4,8 @@ open! Languages
 open! Types
 
 let%expect_test "parse a simple program" =
-  let open C_style_frontend in
-  let sexps = Sexp.load_sexps "programs/basic_syntax.sexp" in
-  let ast = parse_ast sexps in
-  ast |> sexp_of_t |> print_s;
+  let ast = Utils.read_from_file "programs/basic_language_features.sexp" in
+  ast |> C_style_frontend.sexp_of_t |> print_s;
   [%expect
     {|
     ((Function_def f (x y)
@@ -33,3 +31,11 @@ let%expect_test "parse a simple program" =
          ((Compare Eq (Register w) (Num 3)) (Num 7))))
        (default (Num 8)))))
     |}]
+
+let%expect_test "parse an invalid function" =
+  let prog = {|
+    (set x (set x 1))
+  |} in
+  let ast = Utils.read_from_str prog in
+  ast |> C_style_frontend.sexp_of_t |> print_s;
+  [%expect {||}]

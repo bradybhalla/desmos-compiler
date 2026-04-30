@@ -46,11 +46,8 @@ let rec compile_expr = function
       let calls, e = compile_expr e in
       (calls, Not e)
   | And (e1, e2) ->
-      let calls1, e1 = compile_expr e1 in
-      let calls2, e2 = compile_expr e2 in
-      if List.length (calls1 @ calls2) > 0 then
-        failwith
-          "call expression in And/Or should not be possible after previous pass";
+      let e1 = compile_expr_enforce_no_extracted_calls e1 in
+      let e2 = compile_expr_enforce_no_extracted_calls e2 in
       ([], And (e1, e2))
   | Or (e1, e2) ->
       let e1 = compile_expr_enforce_no_extracted_calls e1 in

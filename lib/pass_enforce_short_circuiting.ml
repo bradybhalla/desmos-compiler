@@ -70,6 +70,6 @@ let rec check_stmt = function
               List.iter body ~f:check_stmt));
       List.iter else_ ~f:check_stmt
 
-let compile (program : t) : t =
-  List.iter program ~f:check_stmt;
-  program
+let compile (program : t) : t = program
+(* List.iter program ~f:check_stmt; *)
+(* program *)
