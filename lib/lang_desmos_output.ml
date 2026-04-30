@@ -42,9 +42,7 @@ let latex_of_register reg =
      names. Other than underscore it should be the job of the frontend. *)
   [%string "R_{%{reg_name}}"]
 
-let latex_wrap_lr left right latex =
-  "\\left" ^ left ^ latex ^ "\\right" ^ right
-
+let latex_wrap_lr left right latex = "\\left" ^ left ^ latex ^ "\\right" ^ right
 let latex_wrap_paren = latex_wrap_lr "(" ")"
 
 let rec latex_of_expr =
@@ -60,14 +58,11 @@ let rec latex_of_expr =
   | Num n ->
       let n_str = Float.to_string n in
       String.chop_suffix_if_exists n_str ~suffix:"."
-  | Add (a, b) ->
-      latex_of_expr a ^ " + " ^ latex_of_expr b |> latex_wrap_paren
-  | Sub (a, b) ->
-      latex_of_expr a ^ " - " ^ latex_of_expr b |> latex_wrap_paren
+  | Add (a, b) -> latex_of_expr a ^ " + " ^ latex_of_expr b |> latex_wrap_paren
+  | Sub (a, b) -> latex_of_expr a ^ " - " ^ latex_of_expr b |> latex_wrap_paren
   | Mult (a, b) ->
       latex_of_expr a ^ " \\cdot " ^ latex_of_expr b |> latex_wrap_paren
-  | Div (a, b) ->
-      latex_of_expr a ^ " / " ^ latex_of_expr b |> latex_wrap_paren
+  | Div (a, b) -> latex_of_expr a ^ " / " ^ latex_of_expr b |> latex_wrap_paren
   | And (a, b) -> latex_of_expr (Mult (a, b)) |> latex_wrap_paren
   | Or (a, b) ->
       latex_of_expr (Sub (Add (a, b), Mult (a, b))) |> latex_wrap_paren

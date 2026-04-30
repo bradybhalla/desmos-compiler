@@ -233,6 +233,6 @@ module Desmos_virtual_machine = struct
   type 'a t = { main : block list; info : 'a } [@@deriving sexp]
 end
 
+module Desmos_output = Lang_desmos_output
 (** The output to desmos, including the runtime environment necessary to execute
     the program. *)
-module Desmos_output = Lang_desmos_output

@@ -32,7 +32,10 @@ let rec compile_expr label_map = function
       If_expr
         {
           conds =
-            [ ((op, compile_expr label_map a, compile_expr label_map b), true_lit) ];
+            [
+              ( (op, compile_expr label_map a, compile_expr label_map b),
+                true_lit );
+            ];
           default = false_lit;
         }
   | If_expr { conds; default } ->

@@ -21,9 +21,7 @@ let rec uncover_register_expr = function
   | If_expr { conds; default } ->
       let cond_regs =
         List.map conds ~f:(fun (cond, e) ->
-            Set.union
-              (uncover_register_expr cond)
-              (uncover_register_expr e))
+            Set.union (uncover_register_expr cond) (uncover_register_expr e))
         |> Register.Set.union_list
       in
       Set.union cond_regs (uncover_register_expr default)
