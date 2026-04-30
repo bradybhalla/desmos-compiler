@@ -1,75 +1,64 @@
 open! Core
 open! Languages
-open! Types
 open C_style_frontend
 
-(* TODO brady: for now we just don't allow non-first conditions that have function calls.
-  (if (g x y) (
-    ...
-  ) elif (h x y) (
-    ...
-  )
-needs to be nested so we have a place for the call to h. we also need to handle if expressions
+let rec compile_expr = function
+  | Unit -> ([], Unit)
+  | Register reg -> ([], Register reg)
+  | Num n -> ([], Num n)
+  | Bool b -> ([], Bool b)
+  | Add (e1, e2) ->
+      let stmts1, e1 = compile_expr e1 in
+      let stmts2, e2 = compile_expr e2 in
+      (stmts1 @ stmts2, Add (e1, e2))
+  | Sub (e1, e2) ->
+      let stmts1, e1 = compile_expr e1 in
+      let stmts2, e2 = compile_expr e2 in
+      (stmts1 @ stmts2, Sub (e1, e2))
+  | Mult (e1, e2) ->
+      let stmts1, e1 = compile_expr e1 in
+      let stmts2, e2 = compile_expr e2 in
+      (stmts1 @ stmts2, Mult (e1, e2))
+  | Div (e1, e2) ->
+      let stmts1, e1 = compile_expr e1 in
+      let stmts2, e2 = compile_expr e2 in
+      (stmts1 @ stmts2, Div (e1, e2))
+  | Mod (e1, e2) ->
+      let stmts1, e1 = compile_expr e1 in
+      let stmts2, e2 = compile_expr e2 in
+      (stmts1 @ stmts2, Mod (e1, e2))
+  | Compare (op, e1, e2) ->
+      let stmts1, e1 = compile_expr e1 in
+      let stmts2, e2 = compile_expr e2 in
+      (stmts1 @ stmts2, Compare (op, e1, e2))
+  | Not e ->
+      let stmts, e = compile_expr e in
+      (stmts, Not e)
+  | Call (func_name, args) ->
+      let stmts, args = args |> List.map ~f:compile_expr |> List.unzip in
+      (List.concat stmts, Call (func_name, args))
+  | And _ -> failwith "TODO"
+  | Or _ -> failwith "TODO"
+  | If_expr _ -> failwith "TODO"
 
-need to be careful about
-  - short ciruiting with and/or
-  - condition in the expression only evaluated if the condition is true
-  - next condition only evaluated if the condition is true
-
-maybe the best way to do it is just fully expand any expression
-that isn't pure
-
-
-TODO: also want to make short circuiting with And/Or explicit. if needed they should be turned into new if statements.
-
- *)
-
-(* NOTE: this is just temporary error checking code that doesn't do the expected thing*)
-
-let rec expr_has_call : expr -> bool = function
-  | Call _ -> true
-  | Unit | Register _ | Num _ | Bool _ -> false
-  | Add (a, b)
-  | Sub (a, b)
-  | Mult (a, b)
-  | Div (a, b)
-  | And (a, b)
-  | Or (a, b)
-  | Mod (a, b)
-  | Compare (_, a, b) ->
-      expr_has_call a || expr_has_call b
-  | Not e -> expr_has_call e
-  | If_expr { conds; default } ->
-      List.exists conds ~f:(fun (cond, e) ->
-          expr_has_call cond || expr_has_call e)
-      || expr_has_call default
-
-let check_expr_no_calls expr =
-  if expr_has_call expr then
-    failwith
-      "function call in expression position where calls are not allowed \
-       (non-first if condition or if_expr condition)"
-
-let rec check_stmt = function
-  | Function_def (_, _, body) -> List.iter body ~f:check_stmt
-  | Return e -> check_expr_no_calls e
-  | Set (_, e) -> check_expr_no_calls e
-  | Call _ -> ()
+and compile_stmt = function
+  | Function_def (name, params, body) ->
+      [ Function_def (name, params, List.concat_map body ~f:compile_stmt) ]
+  | Return expr ->
+      let stmts, expr = compile_expr expr in
+      stmts @ [ Return expr ]
+  | Set (reg, expr) ->
+      let stmts, expr = compile_expr expr in
+      stmts @ [ Set (reg, expr) ]
+  | Call (func_name, args) ->
+      let stmts, args = args |> List.map ~f:compile_expr |> List.unzip in
+      List.concat stmts @ [ Call (func_name, args) ]
   | While (cond, body) ->
-      check_expr_no_calls cond;
-      List.iter body ~f:check_stmt
-  | If { branches; else_ } ->
-      (match branches with
-      | [] -> ()
-      | (_, first_body) :: rest ->
-          (* First condition may have calls — only check its body stmts *)
-          List.iter first_body ~f:check_stmt;
-          (* Remaining conditions must not have calls in their condition expr *)
-          List.iter rest ~f:(fun (cond, body) ->
-              check_expr_no_calls cond;
-              List.iter body ~f:check_stmt));
-      List.iter else_ ~f:check_stmt
+      let stmts_before_cond, cond = compile_expr cond in
+      stmts_before_cond
+      @ [
+          While (cond, List.concat_map body ~f:compile_stmt @ stmts_before_cond);
+        ]
+  | If _ -> failwith "TODO"
 
-let compile (program : t) : t = program
-(* List.iter program ~f:check_stmt; *)
-(* program *)
+let compile program = List.concat_map program ~f:compile_stmt

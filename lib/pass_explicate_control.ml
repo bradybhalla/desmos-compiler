@@ -4,15 +4,7 @@ open! Types
 
 (* TODO: this pass got kind of complicated because I wanted to have the blocks work a certain way for future optimizations. hopefully it actually works otherwise I made it more annoying than I had to for nothing. *)
 
-(* TODO brady: generator should be wrapped in a module probably *)
-let next_label_id = ref 0
-
-let generate_label str =
-  let res = [%string "label_%{!next_label_id#Int}_%{str}"] in
-  next_label_id := !next_label_id + 1;
-  Label.of_string res
-
-let reset_label_generator () = next_label_id := 0
+let label_gen = Label_generator.create "explicate_control"
 
 let rec compile_expr = function
   | C_style_separated_functions.Unit -> failwith "TODO: unit"
@@ -61,10 +53,14 @@ let rec compile_statements ~cur_label ~default_next ~stmts_rev ~blocks_rev =
              }
             :: blocks_rev)
       | If { branches; else_ } ->
-          let final_label = generate_label "if_statement_exit" in
+          let final_label =
+            Label_generator.generate ~desc:"if_statement_exit" label_gen
+          in
           let branch_conds, branch_blocks =
             List.map branches ~f:(fun (cond, stmts) ->
-                let cur_label = generate_label "if_statement_branch" in
+                let cur_label =
+                  Label_generator.generate ~desc:"if_statement_branch" label_gen
+                in
                 let cond = compile_expr cond in
                 let blocks =
                   compile_statements ~cur_label
@@ -79,7 +75,9 @@ let rec compile_statements ~cur_label ~default_next ~stmts_rev ~blocks_rev =
             match else_ with
             | [] -> (final_label, [])
             | stmts ->
-                let cur_label = generate_label "if_statement_else" in
+                let cur_label =
+                  Label_generator.generate ~desc:"if_statement_else" label_gen
+                in
                 let blocks =
                   compile_statements ~cur_label
                     ~default_next:
@@ -106,9 +104,13 @@ let rec compile_statements ~cur_label ~default_next ~stmts_rev ~blocks_rev =
           in
           compile_statements ~cur_label:final_label ~default_next ~stmts_rev:[]
             ~blocks_rev rest
-      | While { cond = cond_stmts, cond_expr; body } ->
-          let final_label = generate_label "while_end" in
-          let entry_label = generate_label "while_entry" in
+      | While { cond = cond_expr; body } ->
+          let final_label =
+            Label_generator.generate ~desc:"while_end" label_gen
+          in
+          let entry_label =
+            Label_generator.generate ~desc:"while_entry" label_gen
+          in
           let jump =
             Jump
               {
@@ -116,21 +118,20 @@ let rec compile_statements ~cur_label ~default_next ~stmts_rev ~blocks_rev =
                 default = final_label;
               }
           in
-          let blocks_before_while =
-            (* statements to prepare condition and then jump  *)
-            compile_statements ~cur_label ~default_next:(Some jump) ~stmts_rev
-              ~blocks_rev:[] cond_stmts
+          let block_before_while =
+            {
+              label = cur_label;
+              body = List.rev stmts_rev;
+              control_flow = jump;
+            }
           in
           let blocks_while_body =
             (* while body, prepare condition, and then jump *)
             compile_statements ~cur_label:entry_label ~default_next:(Some jump)
-              ~stmts_rev:[] ~blocks_rev:[] (body @ cond_stmts)
+              ~stmts_rev:[] ~blocks_rev:[] body
           in
           let blocks_rev =
-            List.fold_left
-              ~f:(fun acc block -> block :: acc)
-              ~init:blocks_rev
-              (blocks_before_while @ blocks_while_body)
+            List.rev (block_before_while :: blocks_while_body) @ blocks_rev
           in
           compile_statements ~cur_label:final_label ~default_next ~stmts_rev:[]
             ~blocks_rev rest
@@ -146,19 +147,21 @@ let rec compile_statements ~cur_label ~default_next ~stmts_rev ~blocks_rev =
             ~stmts_rev:(stmt :: stmts_rev) ~blocks_rev rest)
 
 let compile C_style_separated_functions.{ functions; main } =
-  reset_label_generator ();
+  Label_generator.reset label_gen;
   Register_func_instrs.
     {
       functions =
         Map.map functions ~f:(fun { params; body } ->
-            let entry_label = generate_label "function_entry" in
+            let entry_label =
+              Label_generator.generate ~desc:"function_entry" label_gen
+            in
             let blocks =
               compile_statements ~cur_label:entry_label ~default_next:None
                 ~stmts_rev:[] ~blocks_rev:[] body
             in
             { entry_label; params; blocks });
       main =
-        (let entry_label = generate_label "main" in
+        (let entry_label = Label_generator.generate ~desc:"main" label_gen in
          compile_statements ~cur_label:entry_label ~default_next:(Some Exit)
            ~stmts_rev:[] ~blocks_rev:[] main);
     }

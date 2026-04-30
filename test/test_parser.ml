@@ -32,10 +32,4 @@ let%expect_test "parse a simple program" =
        (default (Num 8)))))
     |}]
 
-let%expect_test "parse an invalid function" =
-  let prog = {|
-    (set x (set x 1))
-  |} in
-  let ast = Utils.read_from_str prog in
-  ast |> C_style_frontend.sexp_of_t |> print_s;
-  [%expect {||}]
+(* TODO: once error checking is handled better add tests for invalid syntax *)

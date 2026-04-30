@@ -39,8 +39,7 @@ module C_style_separated_functions = struct
     | Return of expr
     | If of { branches : (expr * stmt list) list; else_ : stmt list }
     | Set of Register.t * expr
-    (* we need to keep any statements needed for the while loop condition so we can put it in the correct place later *)
-    | While of { cond : stmt list * expr; body : stmt list }
+    | While of { cond : expr; body : stmt list }
     | Call of {
         func_name : Function_name.t;
         args : expr list;
