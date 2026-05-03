@@ -29,6 +29,7 @@ let rec compile_expr = function
           default = compile_expr default;
         }
 
+(* TODO: storing things as rev makes it slightly more efficent, but maybe I should just concat to keep it more readable. right now it is kind of hard to follow the logic.  *)
 let rec compile_statements ~cur_label ~default_next ~stmts_rev ~blocks_rev =
   let open Register_func_instrs in
   function
@@ -97,11 +98,7 @@ let rec compile_statements ~cur_label ~default_next ~stmts_rev ~blocks_rev =
             ]
             @ List.concat branch_blocks @ else_blocks
           in
-          let blocks_rev =
-            List.fold_left
-              ~f:(fun acc block -> block :: acc)
-              ~init:blocks_rev blocks_to_add
-          in
+          let blocks_rev = List.rev blocks_to_add @ blocks_rev in
           compile_statements ~cur_label:final_label ~default_next ~stmts_rev:[]
             ~blocks_rev rest
       | While { cond = cond_expr; body } ->

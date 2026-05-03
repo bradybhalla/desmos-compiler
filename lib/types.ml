@@ -26,21 +26,25 @@ module Compare_op = struct
 end
 
 module Unique_generator (M : String_id.S) = struct
-  type t = { cur : int ref; id : string }
+  type t = { mutable cur : int; id : string; mutable has_been_reset : bool }
 
   (* id needs to be unique per generator or there will be repeats  *)
-  let create id = { cur = ref 0; id }
+  let create id = { cur = 0; id; has_been_reset = false }
 
-  let generate ?(desc = "") { cur; id } =
+  let generate ?(desc = "") t =
+    if not t.has_been_reset then
+      failwith "must reset generator before use for consistent results";
     let str =
       match desc with
-      | "" -> [%string "%{id}_%{!cur#Int}"]
-      | desc -> [%string "%{id}_%{!cur#Int}_%{desc}"]
+      | "" -> [%string "%{t.id}_%{t.cur#Int}"]
+      | desc -> [%string "%{t.id}_%{t.cur#Int}_%{desc}"]
     in
-    cur := !cur + 1;
+    t.cur <- t.cur + 1;
     M.of_string str
 
-  let reset { cur; id = _ } = cur := 0
+  let reset t =
+    t.cur <- 0;
+    t.has_been_reset <- true
 end
 
 module Register_generator = Unique_generator (Register)

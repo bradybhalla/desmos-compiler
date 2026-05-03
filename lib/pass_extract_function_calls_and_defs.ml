@@ -5,6 +5,33 @@ open C_style_frontend
 
 let register_gen = Register_generator.create "0extract_function_calls"
 
+(* iterate over (compiled) branches and either add them in parallel to the current if statement
+   or create a nested if statement depening on whether there are possible side effects
+   from evaluating the condition *)
+let construct_short_circuited_if branches else_ =
+  let rec helper branches else_ branches_acc_rev =
+    match branches with
+    | [] ->
+        if List.is_empty branches_acc_rev then
+          failwith "attempted to construct empty list";
+        C_style_separated_functions.If
+          { branches = List.rev branches_acc_rev; else_ }
+    | ((cond_stmts, cond), body) :: rest -> (
+        match cond_stmts with
+        | [] -> helper rest else_ ((cond, body) :: branches_acc_rev)
+        | cond_stmts ->
+            C_style_separated_functions.If
+              {
+                branches = List.rev branches_acc_rev;
+                else_ = cond_stmts @ [ helper rest else_ [ (cond, body) ] ];
+              })
+  in
+  match branches with
+  | [] -> failwith "if statement with no conditions is not allowed"
+  | ((cond_stmts, cond), body) :: rest ->
+      (* statements from first branch go in the toplevel *)
+      cond_stmts @ [ helper rest else_ [ (cond, body) ] ]
+
 let rec compile_expr = function
   | Unit -> ([], C_style_separated_functions.Unit)
   | Register reg -> ([], Register reg)
@@ -37,30 +64,74 @@ let rec compile_expr = function
   | Not e ->
       let calls, e = compile_expr e in
       (calls, Not e)
-  | And (e1, e2) ->
-      let e1 = compile_expr_enforce_no_extracted_calls e1 in
-      let e2 = compile_expr_enforce_no_extracted_calls e2 in
-      ([], And (e1, e2))
-  | Or (e1, e2) ->
-      let e1 = compile_expr_enforce_no_extracted_calls e1 in
-      let e2 = compile_expr_enforce_no_extracted_calls e2 in
-      ([], Or (e1, e2))
+  | And (e1, e2) -> (
+      let stmts1, e1' = compile_expr e1 in
+      let stmts2, e2' = compile_expr e2 in
+      match stmts2 with
+      | [] -> (stmts1, And (e1', e2'))
+      | _ ->
+          (* e1 and e2 == if e1 then e2 else false *)
+          let store_register =
+            Register_generator.generate ~desc:"and" register_gen
+          in
+          ( construct_short_circuited_if
+              [ ((stmts1, e1'), stmts2 @ [ Set (store_register, e2') ]) ]
+              [ Set (store_register, Bool false) ],
+            Register store_register ))
+  | Or (e1, e2) -> (
+      let stmts1, e1' = compile_expr e1 in
+      let stmts2, e2' = compile_expr e2 in
+      match stmts2 with
+      | [] -> (stmts1, Or (e1', e2'))
+      | _ ->
+          (* e1 or e2 == if e1 then true else e2 *)
+          let store_register =
+            Register_generator.generate ~desc:"or" register_gen
+          in
+          ( construct_short_circuited_if
+              [ ((stmts1, e1'), [ Set (store_register, Bool true) ]) ]
+              (stmts2 @ [ Set (store_register, e2') ]),
+            Register store_register ))
   | If_expr { conds; default } ->
-      ( [],
-        If_expr
-          {
-            conds =
-              List.map conds ~f:(fun (expr, result) ->
-                  ( compile_expr_enforce_no_extracted_calls expr,
-                    compile_expr_enforce_no_extracted_calls result ));
-            default = compile_expr_enforce_no_extracted_calls default;
-          } )
+      let conds' =
+        List.map conds ~f:(fun (cond, value) ->
+            (compile_expr cond, compile_expr value))
+      in
+      let defualt_stmts, default = compile_expr default in
+      if
+        List.for_all conds' ~f:(fun ((cond_stmts, _), (value_stmts, _)) ->
+            List.is_empty cond_stmts && List.is_empty value_stmts)
+        && List.is_empty defualt_stmts
+      then
+        (* if there are no side-effects we can keep the same form *)
+        ( [],
+          If_expr
+            {
+              conds =
+                List.map conds' ~f:(fun ((_, cond), (_, value)) ->
+                    (cond, value));
+              default;
+            } )
+      else
+        (* statements or expressions have side-effects so need to turn it
+          into an if statement for proper short-circuiting *)
+        let store_register =
+          Register_generator.generate ~desc:"ifexpr" register_gen
+        in
+        let branches =
+          List.map conds' ~f:(fun (cond, (value_stmts, value)) ->
+              (cond, value_stmts @ [ Set (store_register, value) ]))
+        in
+        let else_ = defualt_stmts @ [ Set (store_register, default) ] in
+        (construct_short_circuited_if branches else_, Register store_register)
   | Call (func_name, args) ->
       let extracted_calls, args =
         args |> List.map ~f:compile_expr |> List.unzip
       in
       let extracted_calls = List.concat extracted_calls in
-      let store_register = Register_generator.generate register_gen in
+      let store_register =
+        Register_generator.generate ~desc:"call" register_gen
+      in
       ( extracted_calls
         @ [
             C_style_separated_functions.Call
@@ -75,45 +146,18 @@ and compile_expr_enforce_no_extracted_calls expr =
   expr
 
 (* Compile normal statements, ignoring function definitions *)
-let rec compile_stmt = function
+and compile_stmt = function
   | Function_def _ -> []
   | Return expr ->
       let extracted_calls, expr = compile_expr expr in
       extracted_calls @ [ C_style_separated_functions.Return expr ]
-  | If { branches = []; _ } -> failwith "empty if statement shouldn't exist"
-  | If { branches = first_branch :: other_branches; else_ } ->
-      (* TODO: once short-circuiting behavior has been fully decided this may need to be updated.
-         Right now this assumes that simultaneous conditionals do short circuit like a normal
-         language. *)
-      let transform_branch ~allow_extracted_calls (cond, body) =
-        let compiled_body = List.concat_map ~f:compile_stmt body in
-        if allow_extracted_calls then
-          let extracted_calls, cond = compile_expr cond in
-          (extracted_calls, (cond, compiled_body))
-        else
-          let cond = compile_expr_enforce_no_extracted_calls cond in
-          ([], (cond, compiled_body))
+  | If { branches; else_ } ->
+      let branches =
+        List.map branches ~f:(fun (cond, body) ->
+            (compile_expr cond, List.concat_map ~f:compile_stmt body))
       in
-      (* It is possible there is a function call in the first conditional,
-         but after the previous pass there should not be any function call
-         in other conditionals. We check this here to catch any possible
-         errors. *)
-      let extracted_calls, first_branch =
-        transform_branch ~allow_extracted_calls:true first_branch
-      in
-      let other_branches =
-        other_branches
-        |> List.map ~f:(transform_branch ~allow_extracted_calls:false)
-        |> List.map ~f:snd
-      in
-      extracted_calls
-      @ [
-          C_style_separated_functions.If
-            {
-              branches = first_branch :: other_branches;
-              else_ = List.concat_map ~f:compile_stmt else_;
-            };
-        ]
+      let else_ = List.concat_map else_ ~f:compile_stmt in
+      construct_short_circuited_if branches else_
   | Set (reg, expr) ->
       (* TODO: if expr is a function call then we have a speical case where we can output a call directly to the register. right now it adds an unnecessary extra step. *)
       let extracted_calls, expr = compile_expr expr in

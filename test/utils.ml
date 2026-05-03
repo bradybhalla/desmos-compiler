@@ -7,8 +7,7 @@ let read_from_file file = file |> Sexp.load_sexps |> C_style_frontend.parse_ast
 let read_from_str str = str |> Sexp.of_string_many |> C_style_frontend.parse_ast
 
 let compile_frontend_to_vm prog =
-  prog |> Pass_enforce_short_circuiting.compile
-  |> Pass_extract_function_calls_and_defs.compile
+  prog |> Pass_extract_function_calls_and_defs.compile
   |> Pass_explicate_control.compile |> Pass_analyze_call_liveness.compile
   |> Pass_convert_functions_to_stack.compile
   |> Pass_make_program_counter_explicit.compile
