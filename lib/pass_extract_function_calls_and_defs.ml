@@ -189,7 +189,9 @@ let extract_and_compile_function_defs = function
             { params; body = List.concat_map ~f:compile_stmt stmts } )
   | Return _ | If _ | Set (_, _) | While (_, _) | Call (_, _) -> None
 
-let compile { C_style_frontend.stmts = program; info = `Checked_functions } =
+let compile
+    ({ C_style_frontend.stmts = program; info = `Checked_function_defs } :
+      [ `Checked_function_defs ] C_style_frontend.t) =
   Register_generator.reset register_gen;
   let functions =
     program

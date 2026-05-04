@@ -4,7 +4,7 @@ open! Languages
 open! Types
 
 let check str =
-  match str |> Utils.read_from_str |> Check_functions.check with
+  match str |> Utils.read_from_str |> Check_function_defs.check with
   | Ok _ -> print_endline "ok"
   | Error e -> print_endline (Error.to_string_hum e)
 

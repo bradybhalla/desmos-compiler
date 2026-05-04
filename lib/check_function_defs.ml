@@ -47,7 +47,7 @@ let extract_function_defs stmts =
 
 let check_function_returns func_name stmts =
   let open Or_error.Let_syntax in
-  (* returns (always ends in return, other errors) *)
+  (* boolean represents if all branches end in a return *)
   let rec helper = function
     | [] -> Ok false
     | stmt :: rest -> (
@@ -73,7 +73,8 @@ let check_function_returns func_name stmts =
   if%bind helper stmts then Ok ()
   else error_s [%sexp "function missing return", (func_name : Function_name.t)]
 
-let check { stmts; _ } =
+let check ({ stmts; info = `Unchecked } : [ `Unchecked ] C_style_frontend.t) :
+    [ `Checked_function_defs ] C_style_frontend.t Or_error.t =
   let open Or_error.Let_syntax in
   (* get function definitions and make sure they are only in the toplevel. also
      make sure there are no returns in the toplevel. *)
@@ -107,4 +108,4 @@ let check { stmts; _ } =
         check_function_returns name body)
     |> Or_error.combine_errors_unit
   in
-  Ok { stmts; info = `Checked_functions }
+  Ok { stmts; info = `Checked_function_defs }
