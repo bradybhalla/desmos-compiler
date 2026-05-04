@@ -28,7 +28,7 @@ type stmt =
   | Call of Function_name.t * expr list
 [@@deriving sexp]
 
-type t = stmt list [@@deriving sexp]
+type 'info t = { stmts : stmt list; info : 'info } [@@deriving sexp]
 
 (* TODO: check only has valid symbols and no keywords. should be added to parse_register_name and parse_function_name
 
@@ -123,4 +123,5 @@ let rec parse_statement = function
       Call (parse_function_name func, List.map ~f:parse_expr args)
   | _ -> failwith "expected statement"
 
-let parse_ast = List.map ~f:parse_statement
+let parse_ast stmts : [ `Unchecked ] t =
+  { stmts = List.map ~f:parse_statement stmts; info = `Unchecked }
