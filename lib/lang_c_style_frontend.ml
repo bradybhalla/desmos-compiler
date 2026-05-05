@@ -24,6 +24,7 @@ type stmt =
   | Return of expr
   | If of { branches : (expr * stmt list) list; else_ : stmt list }
   | Set of Register.t * expr
+  | Decl of Register.t
   | While of expr * stmt list
   | Call of Function_name.t * expr list
 [@@deriving sexp]
@@ -38,6 +39,7 @@ type 'info t = { stmts : stmt list; info : 'info } [@@deriving sexp]
 
     keywords (so far):
       def
+      decl
       while
       set
       if
@@ -117,6 +119,7 @@ let rec parse_statement = function
       If { branches; else_ }
   | List [ Atom "set"; register; expr ] ->
       Set (parse_register_name register, parse_expr expr)
+  | List [ Atom "decl"; register ] -> Decl (parse_register_name register)
   | List [ Atom "while"; cond; List body ] ->
       While (parse_expr cond, List.map ~f:parse_statement body)
   | List (func :: args) ->

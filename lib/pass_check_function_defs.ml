@@ -31,7 +31,8 @@ let extract_function_defs stmts =
         | While (_, body) ->
             let%bind () = check_nontoplevel ~returns_allowed body in
             check_nontoplevel ~returns_allowed rest
-        | Set (_, _) | Call (_, _) -> check_nontoplevel ~returns_allowed rest)
+        | Set (_, _) | Call (_, _) | Decl _ ->
+            check_nontoplevel ~returns_allowed rest)
   in
   let check_toplevel = function
     | Function_def (name, params, body) ->
@@ -68,12 +69,12 @@ let check_function_returns func_name stmts =
         | While (_, body) ->
             let%bind _ = helper body in
             helper rest
-        | Set (_, _) | Call (_, _) -> helper rest)
+        | Set (_, _) | Call (_, _) | Decl _ -> helper rest)
   in
   if%bind helper stmts then Ok ()
   else error_s [%sexp "function missing return", (func_name : Function_name.t)]
 
-let check ({ stmts; info = `Unchecked } : [ `Unchecked ] C_style_frontend.t) :
+let compile ({ stmts; info = `Unchecked } : [ `Unchecked ] C_style_frontend.t) :
     [ `Checked_function_defs ] C_style_frontend.t Or_error.t =
   let open Or_error.Let_syntax in
   (* get function definitions and make sure they are only in the toplevel. also

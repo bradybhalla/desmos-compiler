@@ -1,4 +1,4 @@
-# Created 2026-04-21 Tue 13:48
+# Created 2026-05-03 Sun 22:44
 #+title: Desmos compiler (CS 81)
 #+author: Brady Bhalla
 #+filetags: :course:
@@ -54,23 +54,33 @@ made more complex in the future.
 - [X] smaller targeted tests
 - [X] once frontend is ready do a medium/large program that will hopefully catch
   small issues (not ready yet but it can be very quickly added)
-** TODO Meeting 4/28
-*** TODO C-like Frontend with actual syntax
-- parse expressions
-- still sexp-based for now
-- error checking pass(es)
-  - check that variable references all actually work (functions can access local
-    vars and global vars but not other ones in the stack)
-  - type checking?
-  - functions have unique names
-  - functions always return
-  - calls have correct number of args
-  - registers defined before being used
-  - are there any unused registers?
-*** TODO Type safety
-- Right now there should just be "num" and "bool"
-- Each expression should track what type it has
-- this doesn't matter as much for now but will be needed to add lists
+** Meeting 4/28
+*** DONE Design frontend language
+"C_style_frontend"
+*** DONE Pass to extract function calls from expressions
+"Extract function calls and defs"
+** TODO [5/8] Meeting 5/5
+*** DONE Explicate control pass
+*** DONE Tests for passes from last week
+See "test_program_correctness"
+*** DONE split if statements pass
+- if, and, or, if_expr all run in 1 step if there are no side effects
+- if there are side effects the short circuiting gets handled correctly
+*** DONE error checking pass for functions
+- function defs in the correct place
+- no duplicate functions or params
+- all branches of a function return
+- kind of annoying to put everything through Or_error monad. it is probably
+  better to have separate checking passes that use the monad and regular compiler
+  passes can assume everything is safe
+- encode error checking state into the type system
+*** DONE tests for function error checking pass
+- most extensive tests I have done so far
+- much easier since they can be written in the frontend language
+*** TODO Variable scope
+*** TODO Types
+*** TODO Error checking and error checking pass
+*** I will be out of town next week!!
 ** Future plans
 *** Lists (and lists of lists)
 - could be stored like

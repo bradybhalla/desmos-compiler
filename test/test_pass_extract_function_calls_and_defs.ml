@@ -5,7 +5,7 @@ open! Types
 
 let print_result stmts =
   { stmts; info = `Unchecked }
-  |> Check_function_defs.check |> ok_exn
+  |> Pass_check_function_defs.compile |> ok_exn
   |> Pass_extract_function_calls_and_defs.compile
   |> C_style_separated_functions.sexp_of_t |> print_s
 

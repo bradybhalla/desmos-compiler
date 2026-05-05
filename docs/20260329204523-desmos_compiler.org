@@ -1,4 +1,4 @@
-# Created 2026-04-21 Tue 13:48
+# Created 2026-05-03 Sun 22:44
 #+title: Desmos compiler
 #+author: Brady Bhalla
 #+filetags: :project:
@@ -9,13 +9,61 @@ I made a first version of this around sophomore year of college, but I hadn't
 learned about assembly or compilers at all yet so it was pretty bad.
 
 I am working on a new version as part of a [[id:97B0001F-6FB3-47B6-9821-D0E69DC27FDD][CS 81]] project.
-* TODO Next things to do
-** next up (before class)
-- add register initialization and other info to be computed in the extract registers pass (rename to prepare registers)
-- make the VM emulator use the given register initialization
-- test the vm fully for the fib program (also test in actual desmos)
-- fill out TODOs in pass descriptions below
-- make the frontend language
+* Next things to do
+** types
+add types everywhere
+probably require a (decl (x : int)) form (optional init value?)
+functions require type info (def f ((x : int) (y : int)) : bool)
+
+- renaming pass that renames variables declared inside of functions
+- typechecking pass that errors with wrong types
+- when a new register is created, need to register it correctly in the map
+** Language cleanup
+- shared expr type (annotated)
+- combine some languages to use the same (parameterized) type
+** how do we handle global variables?
+
+** error checking
+- check_functions
+  - runs on C_style_frontend, checks
+    - every branch has a return at the end
+    - no code after returns
+    - function definitions only at toplevel (order doesn't matter)
+    - functions have unique names
+  - maps unit C_style_frontend -> (`Checked_functions C_style_frontend) Or_error.t
+
+- then extract functions pass (-> C_style_extracted_functions)
+
+- then do check variable scopes in C_style_extracted_functions ->
+  `Checked_variable_usage C_style_extracted_functions Or_error
+  - track current frame
+
+- then do rename_scoped_variables (`Checked_variables C_style_extr_func ->
+  `Safe_global_variables C_style_ext_func)
+  - if vars inside a funciton/if/while have the same name as one global or
+    outside, then rename it to a new variable
+  - look very similar to the checking one
+
+- typecheck (if I want nice errors need to annotate first few passes with line
+  and original code)
+  - `Safe_global_variables C_style_extracted_functions -> (`Typechecked (Type.t
+    Register_map.t)) C_style_extracted_functions Or_error
+  - every scoped register is unique so we just need one global map
+
+- in passes further down we need to propagate the type map
+** lists
+** liveness analysis
+** compression
+** things that are weird
+- some types are hard to read (alias as modules?)
+- do functions really need an entry_label? maybe just have the helper function
+  get imported everywhere and assume it starts the same way as "main".
+- desmos virutal machine doesn't need an Exit, we should be able to remove that
+** Remove link register
+we don't really need a link register if we have program_counter. however, it
+shows up too late into the compilation so maybe sticking with link is the way to
+go. I think I could just implement "link" in the pc register anyway and it would
+all work out fine.
 ** Think hard about optimizations
 - rearrange while you still have liveness information about registers (while
   functions are still around). bring as many sets as you can before a function
@@ -28,33 +76,50 @@ Then emulation would be even more similar to how things run in desmos. The
 current desmos_vm would be "<figure out name>" and would be the main language
 for optimizations. That way I could make it slightly more complex and not have
 to worry about emulating it. This is a problem for later though.
-** things that are weird
-- conditionals (do we need a bool and conditional? it makes the output nicer but
-  maybe isn't actually necessary )
-- some types are hard to read (alias as modules?)
-- do functions really need an entry_label? maybe just have the helper function
-  get imported everywhere and assume it starts the same way as "main".
-- desmos virutal machine doesn't need an Exit, we should be able to remove that
-
-we don't really need a link register if we have program_counter. however, it
-shows up too late into the compilation so maybe sticking with link is the way to
-go. I think I could just implement "link" in the pc register anyway and it would
-all work out fine.
 ** add a reset action
 ** Register naming safety
 Adding "stack" isn't very safe. Since I won't allow numbers at the beginning of
 variables, I can use "R_{0xx}" for registers like return/pc, "R_{1xxStack}" for
 variable stacks. "R_{xx}" for normal registers.
-* Overview of compiler (up to date as of 4/21)
+* Overview of compiler (up to date as of 4/29)
+** [`Unchecked] C_style_frontend                                   :language:
+The current starting language. It is imperative and has features like variables,
+functions, while loops, if statements, and basic math expressions.
+** "Check function defs"                                      :error_checker:
+- function defs in the correct place
+- no duplicate functions or params
+- all branches of a function return
+** [`Checked_function_defs] C_style_frontend                       :language:
+Same as previous language but with a witness to prove it has been checked for
+function definition errors.
+** "Extract function calls and defs"                                   :pass:
+- When a function call is inside of a complex expression, move it to a separate
+  statement which saves the value to a register, and then use the register in
+  its place.
+- An important part of this is correctly handling short circuiting logic. For
+  example if an and/or/conditional contains a function call, it may need to be
+  turned into an if statement to ensure the function is only called when it is
+  necessary.
+- This pass also finds toplevel function definitions and stores them in a map.
+** C_style_separated_functions                                     :language:
+A language which is pretty similar to the previous one but requires that all
+function calls are statements instead of expressions. It also stores the program
+statements separately from the function definitions.
+** "Explicate control"                                                 :pass:
+Turn control flow (if/while) into jumps. This pass also changes the overall
+layout of the program from a list of statements to a list of blocks which each
+have a label, list of statements, and control flow operation to do at the end of
+the block.
 ** Register_func_instrs                                            :language:
-The current starting language, which is essentially a register-based instruction
-set that has support for functions. Since Desmos can handle complex instructions
-in each update rule, the instructions in this language can contain full
-expressions (unlike assembly). The different things you can do are:
+A register-based instruction set that has support for functions. The different
+things you can do are:
 - Set a register to an expression
-- Jump to the label of the first true condition, otherwise to the default label
 - Call a function and possibly put the output in the given register
+- Jump to the label of the first true condition, otherwise to the default label
 - Return an expression from a function
+This language makes a distinction between normal statements (Set/Call) and
+control flow operations (Jump/Return). Control flow is only allowed (and
+required) at the end of a block.
 ** "Analyze call liveness"                                             :pass:
 Go through the instructions and figure out which registers are "live" at each
 "Call" instruction. Right now this is just all the registers in the
@@ -97,10 +162,20 @@ used to run the program.
 Desmos expressions that will simulate the program when the main action is
 repeatedly run. This language prints out JavaScript code that will insert all
 necessary expressions in Desmos when pasted into the console.
+* Overview of optimizations
+** Simultaneous condition evaluation
+This is more of a language feature than an optimization, but whenever there are
+multiple conditions (if/elif or ifexpr) Desmos can evaluate all of them at once
+and figure out what to do next.
+
+Relevant passes:
+- Enforce short circuiting -- if there are function calls in the conditions then
+  ensure we don't do simultaneous condition evaluation
 * Emulator for Register.Set.t Desmos_virtual_machine
 Used for testing without actually needing to run things in Desmos. This avoids
-having to do a lot of annoying browser automation. This language is pretty close
+having to do a lot of annoying browser automation. The language is pretty close
 to the Desmos_output language but is more readable so I think it will be much
-easier to debug. This is also the language that some of the optimizations are
-going to happen in to being able to run before and after will be nice.
+easier to debug if it is the emulator target.
+* [4/4] Cleanup from this week                                      :ARCHIVE:
+* Overview of compiler (up to date as of 4/21)                      :ARCHIVE:
 * Overview of compiler (up to date as of 4/14)                      :ARCHIVE:

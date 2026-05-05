@@ -173,6 +173,7 @@ and compile_stmt = function
               body = List.concat_map ~f:compile_stmt stmts @ stmts_before_cond;
             };
         ]
+  | Decl reg -> [ C_style_separated_functions.Decl reg ]
   | Call (func_name, args) ->
       let extracted_calls, args =
         args |> List.map ~f:compile_expr |> List.unzip
@@ -187,7 +188,7 @@ let extract_and_compile_function_defs = function
         ( name,
           C_style_separated_functions.
             { params; body = List.concat_map ~f:compile_stmt stmts } )
-  | Return _ | If _ | Set (_, _) | While (_, _) | Call (_, _) -> None
+  | Return _ | If _ | Set (_, _) | Decl _ | While (_, _) | Call (_, _) -> None
 
 let compile
     ({ C_style_frontend.stmts = program; info = `Checked_function_defs } :
@@ -201,4 +202,5 @@ let compile
   {
     C_style_separated_functions.functions;
     main = List.concat_map ~f:compile_stmt program;
+    info = `Unchecked;
   }

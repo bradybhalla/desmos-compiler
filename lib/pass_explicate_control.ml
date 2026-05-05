@@ -6,6 +6,7 @@ open! Types
 
 let label_gen = Label_generator.create "explicate_control"
 
+(* TODO: figure out how to compile away units *)
 let rec compile_expr = function
   | C_style_separated_functions.Unit -> failwith "TODO: unit"
   | Register reg -> Register_func_instrs.Register reg
@@ -44,7 +45,7 @@ let rec compile_statements ~cur_label ~default_next ~stmts_rev ~blocks_rev =
         :: blocks_rev)
   | stmt :: rest -> (
       match stmt with
-      | C_style_separated_functions.Return expr ->
+      | C_style_registers.Return expr ->
           (* TODO: warn if rest is nonempty. however it is not so simple because an early return inside of a while loop is fine. *)
           List.rev
             ({
@@ -143,7 +144,7 @@ let rec compile_statements ~cur_label ~default_next ~stmts_rev ~blocks_rev =
           compile_statements ~cur_label ~default_next
             ~stmts_rev:(stmt :: stmts_rev) ~blocks_rev rest)
 
-let compile C_style_separated_functions.{ functions; main } =
+let compile C_style_registers.{ functions; main } =
   Label_generator.reset label_gen;
   Register_func_instrs.
     {

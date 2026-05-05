@@ -39,6 +39,7 @@ module C_style_separated_functions = struct
     | Return of expr
     | If of { branches : (expr * stmt list) list; else_ : stmt list }
     | Set of Register.t * expr
+    | Decl of Register.t
     | While of { cond : expr; body : stmt list }
     | Call of {
         func_name : Function_name.t;
@@ -50,7 +51,37 @@ module C_style_separated_functions = struct
   type function_def = { params : Register.t list; body : stmt list }
   [@@deriving sexp]
 
-  type t = { functions : function_def Function_name.Map.t; main : stmt list }
+  type 'a t = {
+    functions : function_def Function_name.Map.t;
+    main : stmt list;
+    info : 'a;
+  }
+  [@@deriving sexp]
+end
+
+module C_style_registers = struct
+  type expr = C_style_separated_functions.expr [@@deriving sexp]
+
+  type stmt =
+    | Return of expr
+    | If of { branches : (expr * stmt list) list; else_ : stmt list }
+    | Set of Register.t * expr
+    | While of { cond : expr; body : stmt list }
+    | Call of {
+        func_name : Function_name.t;
+        args : expr list;
+        ret : Register.t option;
+      }
+  [@@deriving sexp]
+
+  type function_def = { params : Register.t list; body : stmt list }
+  [@@deriving sexp]
+
+  type t = {
+    functions : function_def Function_name.Map.t;
+    main : stmt list;
+    registers : Register.Set.t;
+  }
   [@@deriving sexp]
 end
 
