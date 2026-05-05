@@ -24,4 +24,11 @@ let%expect_test "fib 8 with a slow recursive function" =
   |> Printf.printf "%f";
   [%expect {| 21.000000 |}]
 
+let%expect_test "highest number in collatz(27)" =
+  Utils.read_from_file "programs/collatz.sexp"
+  |> Utils.compile_frontend_to_vm
+  |> Utils.run_vm_and_get_ouptput ~output_reg_name:"highest"
+  |> Printf.printf "%f";
+  [%expect {| 9232.000000 |}]
+
 (* TODO: once global variable access works correctly test short-circuiting *)
