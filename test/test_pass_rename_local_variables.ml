@@ -4,8 +4,7 @@ open! Languages
 open! Types
 
 let compile str =
-  str |> Utils.read_from_str
-  |> Pass_check_function_defs.compile |> ok_exn
+  str |> Utils.read_from_str |> Pass_check_function_defs.compile |> ok_exn
   |> Pass_extract_function_calls_and_defs.compile
   |> Pass_check_variable_scopes.compile |> ok_exn
   |> Pass_rename_local_variables.compile
@@ -47,9 +46,9 @@ let%expect_test "rename local variables" =
       ))
     ))
     |}
-  |> [%sexp_of: C_style_registers.t]
-  |> print_s;
-  [%expect {|
+  |> [%sexp_of: C_style_registers.t] |> print_s;
+  [%expect
+    {|
     ((functions
       ((foo
         ((params (1rename_local_vars_3 1rename_local_vars_4))

@@ -29,16 +29,15 @@ let%expect_test "sanitize register names" =
             ];
         };
       init_registers =
-        List.map
-          [ "a"; "a_a"; "a__a"; "aa"; "aaa"; "a_a_"; "_aa"; "aa_" ]
+        List.map [ "a"; "a_a"; "a__a"; "aa"; "aaa"; "a_a_"; "_aa"; "aa_" ]
           ~f:(fun name -> (Register.of_string name, Num 0.));
       info = `Unsanitized;
     }
   in
   Pass_sanitize_register_names.compile input
-  |> [%sexp_of: [ `Sanitized ] t]
-  |> print_s;
-  [%expect {|
+  |> [%sexp_of: [ `Sanitized ] t] |> print_s;
+  [%expect
+    {|
     ((program_action
       ((conds ())
        (default
