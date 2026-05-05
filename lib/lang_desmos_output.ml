@@ -29,11 +29,12 @@ type set = Register.t * expr [@@deriving sexp]
 type action = { conds : (condition * set list) list; default : set list }
 [@@deriving sexp]
 
-type t = { program_action : action; init_registers : set list }
+type 'a t = { program_action : action; init_registers : set list; info : 'a }
 [@@deriving sexp]
 
 let get_stack_register reg =
-  Register.of_string (Register.to_string reg ^ "Stack")
+  (* TODO: right now nothing else should start with 2, but maybe there is a better way to enforce the uniqueness here *)
+  Register.of_string ("2" ^ Register.to_string reg ^ "Stack")
 
 let latex_of_register reg =
   let reg_name = Register.to_string reg in
@@ -124,7 +125,8 @@ let latex_of_action { conds; default } =
       String.concat ~sep:", " conds_latex ^ ", " ^ latex_of_set_list default
       |> latex_wrap_lr "\\{" "\\}"
 
-let to_pastable_javascript { program_action; init_registers } =
+let to_pastable_javascript
+    ({ program_action; init_registers; info = `Sanitized } : [ `Sanitized ] t) =
   let action_latex = latex_of_action program_action in
   let register_latex =
     List.map init_registers ~f:(fun (reg, expr) ->

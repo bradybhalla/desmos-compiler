@@ -115,4 +115,4 @@ let compile (program : _ Desmos_virtual_machine.t) =
              (get_stack_register reg, ListLiteral [ Num 5.4321 ]);
            ])
   in
-  { program_action; init_registers }
+  { program_action; init_registers; info = `Unsanitized }

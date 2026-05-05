@@ -32,6 +32,7 @@ let%expect_test "register saving and restoring at a call site" =
             control_flow = Exit;
           };
         ];
+      registers = Register.Set.empty;
     }
   in
   prog |> Pass_convert_functions_to_stack.compile

@@ -28,7 +28,8 @@ end
 module Unique_generator (M : String_id.S) = struct
   type t = { mutable cur : int; id : string; mutable has_been_reset : bool }
 
-  (* id needs to be unique per generator or there will be repeats  *)
+  (* id needs to be unique per generator or there will be repeats. It starts
+     with a number to avoid conflict with user defined variables.  *)
   let create id = { cur = 0; id; has_been_reset = false }
 
   let generate ?(desc = "") t =
@@ -47,5 +48,11 @@ module Unique_generator (M : String_id.S) = struct
     t.has_been_reset <- true
 end
 
-module Register_generator = Unique_generator (Register)
+module Register_generator = struct
+  include Unique_generator (Register)
+
+  (* make id start with 1 to avoid conflict with user defined variables *)
+  let create id = create ("1" ^ id)
+end
+
 module Label_generator = Unique_generator (Label)

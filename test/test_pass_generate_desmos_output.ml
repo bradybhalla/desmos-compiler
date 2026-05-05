@@ -2,53 +2,63 @@ open! Core
 open! Desmos_compiler
 open! Languages
 open! Types
+open! Desmos_virtual_machine
+
+(* this also runs sanitize registers in order to print js output but that is a pretty trivial pass so it should be fine *)
+
+let compile prog =
+  prog |> Pass_generate_desmos_output.compile
+  |> Pass_sanitize_register_names.compile
+
+let print_sexp compiled =
+  compiled |> [%sexp_of: [ `Sanitized ] Desmos_output.t] |> print_s
+
+let print_js compiled =
+  compiled |> Desmos_output.to_pastable_javascript |> print_endline
 
 let%expect_test "0 instructions" =
-  let prog : Desmos_virtual_machine.expr Register.Map.t Desmos_virtual_machine.t
-      =
-    let open Desmos_virtual_machine in
-    {
-      main = [ { label = Label.of_string "main"; body = [] } ];
-      info = Register.Map.of_alist_exn [ (program_counter_reg, Num 0.) ];
-    }
+  let prog =
+    compile
+      {
+        main = [ { label = Label.of_string "main"; body = [] } ];
+        info = Register.Map.of_alist_exn [ (program_counter_reg, Num 0.) ];
+      }
   in
-  let output = prog |> Pass_generate_desmos_output.compile in
-  output |> Desmos_output.sexp_of_t |> print_s;
+  print_sexp prog;
   [%expect
     {|
     ((program_action ((conds ()) (default ((00pc (Register 00pc))))))
-     (init_registers ((00pc (Num 0)) (00pcStack (ListLiteral ((Num 5.4321)))))))
+     (init_registers ((00pc (Num 0)) (200pcStack (ListLiteral ((Num 5.4321))))))
+     (info Sanitized))
     |}];
-  output |> Desmos_output.to_pastable_javascript |> print_endline;
+  print_js prog;
   [%expect
-    {| Calc.setExpressions([{latex: "R_{00pc}\\to R_{00pc}"}, {latex: "R_{00pc}=0"}, {latex: "R_{00pcStack}=\\left[5.4321\\right]"}]) |}]
+    {| Calc.setExpressions([{latex: "R_{00pc}\\to R_{00pc}"}, {latex: "R_{00pc}=0"}, {latex: "R_{200pcStack}=\\left[5.4321\\right]"}]) |}]
 
 let%expect_test "multiple instructions" =
-  let prog : Desmos_virtual_machine.expr Register.Map.t Desmos_virtual_machine.t
-      =
-    let open Desmos_virtual_machine in
+  let prog =
     let a = Register.of_string "a" in
     let b = Register.of_string "b" in
-    {
-      main =
-        [
-          {
-            label = Label.of_string "main";
-            body =
-              [
-                Instruction [ (a, Set (Num 1.)); (b, Set (Num 2.)) ];
-                Instruction [ (a, Set (Register a)) ];
-                Exit;
-              ];
-          };
-        ];
-      info =
-        Register.Map.of_alist_exn
-          [ (program_counter_reg, Num 0.); (a, Num 0.); (b, Num 0.) ];
-    }
+    compile
+      {
+        main =
+          [
+            {
+              label = Label.of_string "main";
+              body =
+                [
+                  Instruction [ (a, Set (Num 1.)); (b, Set (Num 2.)) ];
+                  Instruction [ (a, Set (Register a)) ];
+                  Exit;
+                ];
+            };
+          ];
+        info =
+          Register.Map.of_alist_exn
+            [ (program_counter_reg, Num 0.); (a, Num 0.); (b, Num 0.) ];
+      }
   in
-  let output = prog |> Pass_generate_desmos_output.compile in
-  output |> Desmos_output.sexp_of_t |> print_s;
+  print_sexp prog;
   [%expect
     {|
     ((program_action
@@ -58,119 +68,118 @@ let%expect_test "multiple instructions" =
          ((Eq (Register 00pc) (Num 2)) ((00pc (Num -1))))))
        (default ((00pc (Register 00pc))))))
      (init_registers
-      ((00pc (Num 0)) (00pcStack (ListLiteral ((Num 5.4321)))) (a (Num 0))
-       (aStack (ListLiteral ((Num 5.4321)))) (b (Num 0))
-       (bStack (ListLiteral ((Num 5.4321)))))))
+      ((00pc (Num 0)) (200pcStack (ListLiteral ((Num 5.4321)))) (a (Num 0))
+       (2aStack (ListLiteral ((Num 5.4321)))) (b (Num 0))
+       (2bStack (ListLiteral ((Num 5.4321))))))
+     (info Sanitized))
     |}];
-  output |> Desmos_output.to_pastable_javascript |> print_endline;
+  print_js prog;
   [%expect
-    {| Calc.setExpressions([{latex: "\\left\\{R_{00pc} = 0: \\left(R_{a}\\to 1, R_{b}\\to 2\\right), R_{00pc} = 1: R_{a}\\to R_{a}, R_{00pc} = 2: R_{00pc}\\to -1, R_{00pc}\\to R_{00pc}\\right\\}"}, {latex: "R_{00pc}=0"}, {latex: "R_{00pcStack}=\\left[5.4321\\right]"}, {latex: "R_{a}=0"}, {latex: "R_{aStack}=\\left[5.4321\\right]"}, {latex: "R_{b}=0"}, {latex: "R_{bStack}=\\left[5.4321\\right]"}]) |}]
+    {| Calc.setExpressions([{latex: "\\left\\{R_{00pc} = 0: \\left(R_{a}\\to 1, R_{b}\\to 2\\right), R_{00pc} = 1: R_{a}\\to R_{a}, R_{00pc} = 2: R_{00pc}\\to -1, R_{00pc}\\to R_{00pc}\\right\\}"}, {latex: "R_{00pc}=0"}, {latex: "R_{200pcStack}=\\left[5.4321\\right]"}, {latex: "R_{a}=0"}, {latex: "R_{2aStack}=\\left[5.4321\\right]"}, {latex: "R_{b}=0"}, {latex: "R_{2bStack}=\\left[5.4321\\right]"}]) |}]
 
 let%expect_test "push and pop" =
-  let prog : Desmos_virtual_machine.expr Register.Map.t Desmos_virtual_machine.t
-      =
-    let open Desmos_virtual_machine in
+  let prog =
     let a = Register.of_string "a" in
     let b = Register.of_string "b" in
     let c = Register.of_string "c" in
     let d = Register.of_string "d" in
-    {
-      main =
-        [
-          {
-            label = Label.of_string "main";
-            body =
-              [
-                Instruction
-                  [
-                    (a, Push);
-                    (b, Pop);
-                    (c, Set (Num 1.));
-                    (d, PushAndSet (Num 1.));
-                  ];
-                Exit;
-              ];
-          };
-        ];
-      info =
-        Register.Map.of_alist_exn
+    compile
+      {
+        main =
           [
-            (program_counter_reg, Num 0.);
-            (a, Num 0.);
-            (b, Num 0.);
-            (c, Num 0.);
-            (d, Num 0.);
+            {
+              label = Label.of_string "main";
+              body =
+                [
+                  Instruction
+                    [
+                      (a, Push);
+                      (b, Pop);
+                      (c, Set (Num 1.));
+                      (d, PushAndSet (Num 1.));
+                    ];
+                  Exit;
+                ];
+            };
           ];
-    }
+        info =
+          Register.Map.of_alist_exn
+            [
+              (program_counter_reg, Num 0.);
+              (a, Num 0.);
+              (b, Num 0.);
+              (c, Num 0.);
+              (d, Num 0.);
+            ];
+      }
   in
-  let output = prog |> Pass_generate_desmos_output.compile in
-  output |> Desmos_output.sexp_of_t |> print_s;
+  print_sexp prog;
   [%expect
     {|
     ((program_action
       ((conds
         (((Eq (Register 00pc) (Num 0))
-          ((aStack (ListJoin (Register aStack) (Register a)))
-           (b (ListIndex (Register bStack) (ListLength (Register bStack))))
-           (bStack
-            (ListSlice (Register bStack) (Num 1)
-             (Sub (ListLength (Register bStack)) (Num 1))))
-           (c (Num 1)) (dStack (ListJoin (Register dStack) (Register d)))
+          ((2aStack (ListJoin (Register 2aStack) (Register a)))
+           (b (ListIndex (Register 2bStack) (ListLength (Register 2bStack))))
+           (2bStack
+            (ListSlice (Register 2bStack) (Num 1)
+             (Sub (ListLength (Register 2bStack)) (Num 1))))
+           (c (Num 1)) (2dStack (ListJoin (Register 2dStack) (Register d)))
            (d (Num 1))))
          ((Eq (Register 00pc) (Num 1)) ((00pc (Num -1))))))
        (default ((00pc (Register 00pc))))))
      (init_registers
-      ((00pc (Num 0)) (00pcStack (ListLiteral ((Num 5.4321)))) (a (Num 0))
-       (aStack (ListLiteral ((Num 5.4321)))) (b (Num 0))
-       (bStack (ListLiteral ((Num 5.4321)))) (c (Num 0))
-       (cStack (ListLiteral ((Num 5.4321)))) (d (Num 0))
-       (dStack (ListLiteral ((Num 5.4321)))))))
+      ((00pc (Num 0)) (200pcStack (ListLiteral ((Num 5.4321)))) (a (Num 0))
+       (2aStack (ListLiteral ((Num 5.4321)))) (b (Num 0))
+       (2bStack (ListLiteral ((Num 5.4321)))) (c (Num 0))
+       (2cStack (ListLiteral ((Num 5.4321)))) (d (Num 0))
+       (2dStack (ListLiteral ((Num 5.4321))))))
+     (info Sanitized))
     |}];
-  output |> Desmos_output.to_pastable_javascript |> print_endline;
+  print_js prog;
   [%expect
-    {| Calc.setExpressions([{latex: "\\left\\{R_{00pc} = 0: \\left(R_{aStack}\\to \\operatorname{join}\\left(R_{aStack}, R_{a}\\right), R_{b}\\to R_{bStack}\\left[\\operatorname{length}\\left(R_{bStack}\\right)\\right], R_{bStack}\\to R_{bStack}\\left[1 ... \\left(\\operatorname{length}\\left(R_{bStack}\\right) - 1\\right)\\right], R_{c}\\to 1, R_{dStack}\\to \\operatorname{join}\\left(R_{dStack}, R_{d}\\right), R_{d}\\to 1\\right), R_{00pc} = 1: R_{00pc}\\to -1, R_{00pc}\\to R_{00pc}\\right\\}"}, {latex: "R_{00pc}=0"}, {latex: "R_{00pcStack}=\\left[5.4321\\right]"}, {latex: "R_{a}=0"}, {latex: "R_{aStack}=\\left[5.4321\\right]"}, {latex: "R_{b}=0"}, {latex: "R_{bStack}=\\left[5.4321\\right]"}, {latex: "R_{c}=0"}, {latex: "R_{cStack}=\\left[5.4321\\right]"}, {latex: "R_{d}=0"}, {latex: "R_{dStack}=\\left[5.4321\\right]"}]) |}]
+    {| Calc.setExpressions([{latex: "\\left\\{R_{00pc} = 0: \\left(R_{2aStack}\\to \\operatorname{join}\\left(R_{2aStack}, R_{a}\\right), R_{b}\\to R_{2bStack}\\left[\\operatorname{length}\\left(R_{2bStack}\\right)\\right], R_{2bStack}\\to R_{2bStack}\\left[1 ... \\left(\\operatorname{length}\\left(R_{2bStack}\\right) - 1\\right)\\right], R_{c}\\to 1, R_{2dStack}\\to \\operatorname{join}\\left(R_{2dStack}, R_{d}\\right), R_{d}\\to 1\\right), R_{00pc} = 1: R_{00pc}\\to -1, R_{00pc}\\to R_{00pc}\\right\\}"}, {latex: "R_{00pc}=0"}, {latex: "R_{200pcStack}=\\left[5.4321\\right]"}, {latex: "R_{a}=0"}, {latex: "R_{2aStack}=\\left[5.4321\\right]"}, {latex: "R_{b}=0"}, {latex: "R_{2bStack}=\\left[5.4321\\right]"}, {latex: "R_{c}=0"}, {latex: "R_{2cStack}=\\left[5.4321\\right]"}, {latex: "R_{d}=0"}, {latex: "R_{2dStack}=\\left[5.4321\\right]"}]) |}]
 
 let%expect_test "nested if_expr" =
-  let prog : Desmos_virtual_machine.expr Register.Map.t Desmos_virtual_machine.t
-      =
-    let open Desmos_virtual_machine in
+  let prog =
     let a = Register.of_string "a" in
-    {
-      main =
-        [
-          {
-            label = Label.of_string "main";
-            body =
-              [
-                Instruction
-                  [
-                    ( a,
-                      Set
-                        (If_expr
-                           {
-                             conds = [];
-                             default =
-                               If_expr
-                                 {
-                                   conds =
-                                     [
-                                       (Compare (Gt, Num 1., Num 1.), Num 1.);
-                                       (Compare (Gt, Num 1., Num 1.), Num 2.);
-                                     ];
-                                   default = Num 3.;
-                                 };
-                           }) );
-                  ];
-                Exit;
-              ];
-          };
-        ];
-      info =
-        Register.Map.of_alist_exn [ (program_counter_reg, Num 0.); (a, Num 0.) ];
-    }
+    compile
+      {
+        main =
+          [
+            {
+              label = Label.of_string "main";
+              body =
+                [
+                  Instruction
+                    [
+                      ( a,
+                        Set
+                          (If_expr
+                             {
+                               conds = [];
+                               default =
+                                 If_expr
+                                   {
+                                     conds =
+                                       [
+                                         (Compare (Gt, Num 1., Num 1.), Num 1.);
+                                         (Compare (Gt, Num 1., Num 1.), Num 2.);
+                                       ];
+                                     default = Num 3.;
+                                   };
+                             }) );
+                    ];
+                  Exit;
+                ];
+            };
+          ];
+        info =
+          Register.Map.of_alist_exn
+            [ (program_counter_reg, Num 0.); (a, Num 0.) ];
+      }
   in
-  let output = prog |> Pass_generate_desmos_output.compile in
-  output |> Desmos_output.sexp_of_t |> print_s;
+  print_sexp prog;
   [%expect
     {|
     ((program_action
@@ -186,9 +195,10 @@ let%expect_test "nested if_expr" =
          ((Eq (Register 00pc) (Num 1)) ((00pc (Num -1))))))
        (default ((00pc (Register 00pc))))))
      (init_registers
-      ((00pc (Num 0)) (00pcStack (ListLiteral ((Num 5.4321)))) (a (Num 0))
-       (aStack (ListLiteral ((Num 5.4321)))))))
+      ((00pc (Num 0)) (200pcStack (ListLiteral ((Num 5.4321)))) (a (Num 0))
+       (2aStack (ListLiteral ((Num 5.4321))))))
+     (info Sanitized))
     |}];
-  output |> Desmos_output.to_pastable_javascript |> print_endline;
+  print_js prog;
   [%expect
-    {| Calc.setExpressions([{latex: "\\left\\{R_{00pc} = 0: R_{a}\\to \\left\\{1 > 1: 1, 1 > 1: 2, 3\\right\\}, R_{00pc} = 1: R_{00pc}\\to -1, R_{00pc}\\to R_{00pc}\\right\\}"}, {latex: "R_{00pc}=0"}, {latex: "R_{00pcStack}=\\left[5.4321\\right]"}, {latex: "R_{a}=0"}, {latex: "R_{aStack}=\\left[5.4321\\right]"}]) |}]
+    {| Calc.setExpressions([{latex: "\\left\\{R_{00pc} = 0: R_{a}\\to \\left\\{1 > 1: 1, 1 > 1: 2, 3\\right\\}, R_{00pc} = 1: R_{00pc}\\to -1, R_{00pc}\\to R_{00pc}\\right\\}"}, {latex: "R_{00pc}=0"}, {latex: "R_{200pcStack}=\\left[5.4321\\right]"}, {latex: "R_{a}=0"}, {latex: "R_{2aStack}=\\left[5.4321\\right]"}]) |}]

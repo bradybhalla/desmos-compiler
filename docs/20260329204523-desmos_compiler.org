@@ -1,4 +1,4 @@
-# Created 2026-05-03 Sun 22:44
+# Created 2026-05-05 Tue 01:04
 #+title: Desmos compiler
 #+author: Brady Bhalla
 #+filetags: :project:
@@ -10,6 +10,34 @@ learned about assembly or compilers at all yet so it was pretty bad.
 
 I am working on a new version as part of a [[id:97B0001F-6FB3-47B6-9821-D0E69DC27FDD][CS 81]] project.
 * Next things to do
+** TODO WHERE I LEFT OFF
+- figure out how function popping needs to work now (I think you just need to
+  analyze if a recursive call is make, maybe need pass to pull out info)
+
+- DECL modifications
+  - right now undefined behavior to use value before setting after declaring
+  - should decl need initial value? or just a type?
+
+parameterize languages better
+
+see TODO important
+- propagate register set all the way down to the end
+
+tests for correctness
+- short circuiting
+  - and/or/ifexpr/if
+
+check that functions are called with the correct number of parameters and all
+called functions exist
+- pass
+
+- if there is an optimization that gets rid of registers then need to recompute,
+  but for now we can just keep them
+
+move list of passes to a .mli file (then I can put the
+types in directly and add documentation)
+
+make an executable for the compiler
 ** types
 add types everywhere
 probably require a (decl (x : int)) form (optional init value?)
@@ -21,29 +49,7 @@ functions require type info (def f ((x : int) (y : int)) : bool)
 ** Language cleanup
 - shared expr type (annotated)
 - combine some languages to use the same (parameterized) type
-** how do we handle global variables?
-
 ** error checking
-- check_functions
-  - runs on C_style_frontend, checks
-    - every branch has a return at the end
-    - no code after returns
-    - function definitions only at toplevel (order doesn't matter)
-    - functions have unique names
-  - maps unit C_style_frontend -> (`Checked_functions C_style_frontend) Or_error.t
-
-- then extract functions pass (-> C_style_extracted_functions)
-
-- then do check variable scopes in C_style_extracted_functions ->
-  `Checked_variable_usage C_style_extracted_functions Or_error
-  - track current frame
-
-- then do rename_scoped_variables (`Checked_variables C_style_extr_func ->
-  `Safe_global_variables C_style_ext_func)
-  - if vars inside a funciton/if/while have the same name as one global or
-    outside, then rename it to a new variable
-  - look very similar to the checking one
-
 - typecheck (if I want nice errors need to annotate first few passes with line
   and original code)
   - `Safe_global_variables C_style_extracted_functions -> (`Typechecked (Type.t
@@ -77,91 +83,6 @@ current desmos_vm would be "<figure out name>" and would be the main language
 for optimizations. That way I could make it slightly more complex and not have
 to worry about emulating it. This is a problem for later though.
 ** add a reset action
-** Register naming safety
-Adding "stack" isn't very safe. Since I won't allow numbers at the beginning of
-variables, I can use "R_{0xx}" for registers like return/pc, "R_{1xxStack}" for
-variable stacks. "R_{xx}" for normal registers.
-* Overview of compiler (up to date as of 4/29)
-** [`Unchecked] C_style_frontend                                   :language:
-The current starting language. It is imperative and has features like variables,
-functions, while loops, if statements, and basic math expressions.
-** "Check function defs"                                      :error_checker:
-- function defs in the correct place
-- no duplicate functions or params
-- all branches of a function return
-** [`Checked_function_defs] C_style_frontend                       :language:
-Same as previous language but with a witness to prove it has been checked for
-function definition errors.
-** "Extract function calls and defs"                                   :pass:
-- When a function call is inside of a complex expression, move it to a separate
-  statement which saves the value to a register, and then use the register in
-  its place.
-- An important part of this is correctly handling short circuiting logic. For
-  example if an and/or/conditional contains a function call, it may need to be
-  turned into an if statement to ensure the function is only called when it is
-  necessary.
-- This pass also finds toplevel function definitions and stores them in a map.
-** C_style_separated_functions                                     :language:
-A language which is pretty similar to the previous one but requires that all
-function calls are statements instead of expressions. It also stores the program
-statements separately from the function definitions.
-** "Explicate control"                                                 :pass:
-Turn control flow (if/while) into jumps. This pass also changes the overall
-layout of the program from a list of statements to a list of blocks which each
-have a label, list of statements, and control flow operation to do at the end of
-the block.
-** Register_func_instrs                                            :language:
-A register-based instruction set that has support for functions. The different
-things you can do are:
-- Set a register to an expression
-- Call a function and possibly put the output in the given register
-- Jump to the label of the first true condition, otherwise to the default label
-- Return an expression from a function
-This language makes a distinction between normal statements (Set/Call) and
-control flow operations (Jump/Return). Control flow is only allowed (and
-required) at the end of a block.
-** "Analyze call liveness"                                             :pass:
-Go through the instructions and figure out which registers are "live" at each
-"Call" instruction. Right now this is just all the registers in the
-function/main.
-** Register_func_instrs_with_call_liveness                         :language:
-Same as previous language but each "Call" statement has information about what
-registers are live.
-** "Convert functions to stack"                                        :pass:
-Compile functions and replace call stacks with local per-register stacks. The
-live registers are used to determine which registers need to saved and restored.
-** Register_stack_instrs                                           :language:
-A register-based instruction set like the previous language, but doesn't have
-direct support for functions anymore. Each register has a stack that its value
-can be pushed/popped from. The things you can do are
-- GeneralizedSet a list of (register,expression) pairs. All expressions are
-  computed before any register is set, and there is an option to push/pop
-  register values.
-- JumpLink will set the link register to the next line and jump to the label.
-  This is the only control flow that can go in the middle of a block, which is
-  allowed because the program will eventually return here.
-- Return will set the program counter to the link register value.
-** "Make program counter explicit"                                     :pass:
-Treat the program counter as a normal register which needs to be manually
-updated at every step.
-** unit Desmos_virtual_machine                                     :language:
-The target language of the compiler which can be almost directly translated to
-Desmos after resolving labels. The instructions just set/pop/push registers and
-exit the program when it is complete.
-** "Prepare registers"                                                 :pass:
-Find which registers are needed and what their initial values should be. For now
-every register starts at 1.2345 except the program counter so it will hopefully
-be easier to detect bugs if a value is never set.
-** expr Register.Map.t Desmos_virtual_machine.t                    :language:
-Same as the previous language but there is a map describing initial values of
-all necessary registers.
-** "Generate Desmos output"                                            :pass:
-Generate an OCaml representation of the actual Desmos expressions that will be
-used to run the program.
-** Desmos_output                                                   :language:
-Desmos expressions that will simulate the program when the main action is
-repeatedly run. This language prints out JavaScript code that will insert all
-necessary expressions in Desmos when pasted into the console.
 * Overview of optimizations
 ** Simultaneous condition evaluation
 This is more of a language feature than an optimization, but whenever there are
@@ -176,6 +97,7 @@ Used for testing without actually needing to run things in Desmos. This avoids
 having to do a lot of annoying browser automation. The language is pretty close
 to the Desmos_output language but is more readable so I think it will be much
 easier to debug if it is the emulator target.
+* Overview of compiler (up to date as of 4/29)                      :ARCHIVE:
 * [4/4] Cleanup from this week                                      :ARCHIVE:
 * Overview of compiler (up to date as of 4/21)                      :ARCHIVE:
 * Overview of compiler (up to date as of 4/14)                      :ARCHIVE:

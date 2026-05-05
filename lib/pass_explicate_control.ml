@@ -34,19 +34,32 @@ let rec compile_expr = function
 let rec compile_statements ~cur_label ~default_next ~stmts_rev ~blocks_rev =
   let open Register_func_instrs in
   function
-  | [] ->
-      let control_flow =
-        Option.value_exn
-          ~message:"control flow statement expected (possibly missing return)"
-          default_next
-      in
-      List.rev
-        ({ label = cur_label; body = List.rev stmts_rev; control_flow }
-        :: blocks_rev)
+  | [] -> (
+      match default_next with
+      | Some control_flow ->
+          List.rev
+            ({ label = cur_label; body = List.rev stmts_rev; control_flow }
+            :: blocks_rev)
+      | None ->
+          (* we have an error checking pass that makes sure every function terminates. to sanity
+             check ourselves we should only be able to get here if stmts_rev is empty *)
+          if not (List.is_empty stmts_rev) then
+            failwith
+              "branch doesn't terminate (this should have been caught in the \
+               error checking pass so there is a compiler bug somehwere)";
+
+          (* we still need to add the block because the label might be referenced by the if statement exit. This block is unreachable. *)
+          (* TODO: add a pass to detect unreachable blocks and remove them *)
+          List.rev
+            ({
+               label = cur_label;
+               body = List.rev stmts_rev;
+               control_flow = Exit;
+             }
+            :: blocks_rev))
   | stmt :: rest -> (
       match stmt with
       | C_style_registers.Return expr ->
-          (* TODO: warn if rest is nonempty. however it is not so simple because an early return inside of a while loop is fine. *)
           List.rev
             ({
                label = cur_label;
@@ -144,7 +157,7 @@ let rec compile_statements ~cur_label ~default_next ~stmts_rev ~blocks_rev =
           compile_statements ~cur_label ~default_next
             ~stmts_rev:(stmt :: stmts_rev) ~blocks_rev rest)
 
-let compile C_style_registers.{ functions; main } =
+let compile C_style_registers.{ functions; main; registers } =
   Label_generator.reset label_gen;
   Register_func_instrs.
     {
@@ -162,4 +175,5 @@ let compile C_style_registers.{ functions; main } =
         (let entry_label = Label_generator.generate ~desc:"main" label_gen in
          compile_statements ~cur_label:entry_label ~default_next:(Some Exit)
            ~stmts_rev:[] ~blocks_rev:[] main);
+      registers;
     }

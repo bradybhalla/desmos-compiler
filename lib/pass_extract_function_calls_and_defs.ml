@@ -3,7 +3,7 @@ open! Languages
 open! Types
 open C_style_frontend
 
-let register_gen = Register_generator.create "0extract_function_calls"
+let register_gen = Register_generator.create "extract_function_calls"
 
 (* iterate over (compiled) branches and either add them in parallel to the current if statement
    or create a nested if statement depening on whether there are possible side effects
@@ -74,9 +74,10 @@ let rec compile_expr = function
           let store_register =
             Register_generator.generate ~desc:"and" register_gen
           in
-          ( construct_short_circuited_if
-              [ ((stmts1, e1'), stmts2 @ [ Set (store_register, e2') ]) ]
-              [ Set (store_register, Bool false) ],
+          ( C_style_separated_functions.Decl store_register
+            :: construct_short_circuited_if
+                 [ ((stmts1, e1'), stmts2 @ [ Set (store_register, e2') ]) ]
+                 [ Set (store_register, Bool false) ],
             Register store_register ))
   | Or (e1, e2) -> (
       let stmts1, e1' = compile_expr e1 in
@@ -88,9 +89,10 @@ let rec compile_expr = function
           let store_register =
             Register_generator.generate ~desc:"or" register_gen
           in
-          ( construct_short_circuited_if
-              [ ((stmts1, e1'), [ Set (store_register, Bool true) ]) ]
-              (stmts2 @ [ Set (store_register, e2') ]),
+          ( C_style_separated_functions.Decl store_register
+            :: construct_short_circuited_if
+                 [ ((stmts1, e1'), [ Set (store_register, Bool true) ]) ]
+                 (stmts2 @ [ Set (store_register, e2') ]),
             Register store_register ))
   | If_expr { conds; default } ->
       let conds' =
@@ -123,7 +125,9 @@ let rec compile_expr = function
               (cond, value_stmts @ [ Set (store_register, value) ]))
         in
         let else_ = defualt_stmts @ [ Set (store_register, default) ] in
-        (construct_short_circuited_if branches else_, Register store_register)
+        ( C_style_separated_functions.Decl store_register
+          :: construct_short_circuited_if branches else_,
+          Register store_register )
   | Call (func_name, args) ->
       let extracted_calls, args =
         args |> List.map ~f:compile_expr |> List.unzip
@@ -134,6 +138,7 @@ let rec compile_expr = function
       in
       ( extracted_calls
         @ [
+            C_style_separated_functions.Decl store_register;
             C_style_separated_functions.Call
               { func_name; args; ret = Some store_register };
           ],
@@ -165,12 +170,17 @@ and compile_stmt = function
   | While (cond, stmts) ->
       (* we need to run stmts_before_cond both before the loop and at the end of the loop body *)
       let stmts_before_cond, cond = compile_expr cond in
+      let non_decl_stmts =
+        List.filter stmts_before_cond ~f:(function
+          | C_style_separated_functions.Decl _ -> false
+          | _ -> true)
+      in
       stmts_before_cond
       @ [
           While
             {
               cond;
-              body = List.concat_map ~f:compile_stmt stmts @ stmts_before_cond;
+              body = List.concat_map ~f:compile_stmt stmts @ non_decl_stmts;
             };
         ]
   | Decl reg -> [ C_style_separated_functions.Decl reg ]

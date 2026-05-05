@@ -1,4 +1,4 @@
-# Created 2026-05-03 Sun 22:44
+# Created 2026-05-05 Tue 01:04
 #+title: Desmos compiler (CS 81)
 #+author: Brady Bhalla
 #+filetags: :course:
@@ -59,14 +59,14 @@ made more complex in the future.
 "C_style_frontend"
 *** DONE Pass to extract function calls from expressions
 "Extract function calls and defs"
-** TODO [5/8] Meeting 5/5
+** Meeting 5/5
 *** DONE Explicate control pass
 *** DONE Tests for passes from last week
 See "test_program_correctness"
-*** DONE split if statements pass
+*** DONE split if statements pass (added into extract function calls)
 - if, and, or, if_expr all run in 1 step if there are no side effects
 - if there are side effects the short circuiting gets handled correctly
-*** DONE error checking pass for functions
+*** DONE error checking pass for functions (and tests)
 - function defs in the correct place
 - no duplicate functions or params
 - all branches of a function return
@@ -74,13 +74,45 @@ See "test_program_correctness"
   better to have separate checking passes that use the monad and regular compiler
   passes can assume everything is safe
 - encode error checking state into the type system
-*** DONE tests for function error checking pass
-- most extensive tests I have done so far
-- much easier since they can be written in the frontend language
-*** TODO Variable scope
-*** TODO Types
-*** TODO Error checking and error checking pass
+*** DONE Variable scope checking (and tests)
+added decl form for variable declarations, which are required before a variable
+use. they can go either at the toplevel or inside of functions/if/while to
+define local variables.
+*** DONE Local variable renaming (and tests)
+- allows global variables to be accessed from inside functions
+- lots of my problems with liveness analysis won't matter if all vars just have
+  different names
+*** DONE Sanitizing registers pass (and test)
+- get rid of underscores so it can go in desmos
+- make sure the new value is always unique
 *** I will be out of town next week!!
+** Meeting 5/12
+*** TODO Revisit convert functions to stack
+- need to rewrite to allow for modifying global vars from functions
+- store local vars from a function only, and only if the function is called
+  again somewhere
+- maybe want to track which registers each function owns?
+*** TODO Test short circuiting correctness
+- make a big program that tests short circuiting by incrementing a global var
+  every time a function executes
+*** TODO Error checking pass for function calls
+- maybe add onto function defs pass?
+*** TODO Language refactor
+- parameterize with type of register set to make adding types easier. also
+  finish propagating the register set all the way down
+- find doubly defined things and make languages reference the previous one where possible
+- Put all passes in a single mli files so they can be used and documented more easily
+*** TODO Handle vars that are used after declared but before defined
+- Should check_variable_scopes also make sure a value is initialized before
+  being used?
+*** TODO Figure out a way to do "stdin" and "stdout"
+*** TODO Add a reset button to the javascript output
+*** TODO Make an actual executable
+- input program
+- flags for which pass to start from and compile to?
+- flags for running with emulator or outputting javascript
+- eventually flags for different optimizations
+*** TODO Types
 ** Future plans
 *** Lists (and lists of lists)
 - could be stored like

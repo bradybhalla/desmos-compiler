@@ -43,6 +43,7 @@ let%expect_test "registers before and after call show up as live" =
             control_flow = Exit;
           };
         ];
+      registers = Register.Set.empty;
     }
   in
   prog |> Pass_analyze_call_liveness.compile
@@ -60,7 +61,8 @@ let%expect_test "registers before and after call show up as live" =
           (Call (func_name f) (args ((Register y))) (ret (z))
            (live_registers (w x y z)))
           (Set w (Register z))))
-        (control_flow Exit)))))
+        (control_flow Exit))))
+     (registers ()))
     |}]
 
 let%expect_test "registers in a function show up with nested calls" =
@@ -121,6 +123,7 @@ let%expect_test "registers in a function show up with nested calls" =
             control_flow = Exit;
           };
         ];
+      registers = Register.Set.empty;
     }
   in
   prog |> Pass_analyze_call_liveness.compile
@@ -144,5 +147,6 @@ let%expect_test "registers in a function show up with nested calls" =
       (((label main)
         (body
          ((Call (func_name f) (args ((Num 10))) (ret ()) (live_registers ()))))
-        (control_flow Exit)))))
+        (control_flow Exit))))
+     (registers ()))
     |}]

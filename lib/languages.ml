@@ -134,7 +134,11 @@ module Register_func_instrs = struct
   }
   [@@deriving sexp]
 
-  type t = { functions : function_def Function_name.Map.t; main : block list }
+  type t = {
+    functions : function_def Function_name.Map.t;
+    main : block list;
+    registers : Register.Set.t;
+  }
   [@@deriving sexp]
 end
 
@@ -170,7 +174,11 @@ module Register_func_instrs_with_call_liveness = struct
   }
   [@@deriving sexp]
 
-  type t = { functions : function_def Function_name.Map.t; main : block list }
+  type t = {
+    functions : function_def Function_name.Map.t;
+    main : block list;
+    registers : Register.Set.t;
+  }
   [@@deriving sexp]
 end
 

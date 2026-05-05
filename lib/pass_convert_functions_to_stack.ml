@@ -95,7 +95,9 @@ let compile_function_def ~functions ((_ : Function_name.t), def) =
         control_flow = compile_control_flow block.control_flow;
       })
 
-let compile { Register_func_instrs_with_call_liveness.functions; main } =
+(* TODO important: finish propagating registers down *)
+let compile
+    { Register_func_instrs_with_call_liveness.functions; main; registers = _ } =
   let main_blocks =
     List.map main ~f:(fun block ->
         {

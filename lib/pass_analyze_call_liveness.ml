@@ -5,6 +5,8 @@ module Rset = Register.Set
 
 (* TODO brady: eventually we can determine which registers a function will actually clobber and add that to the Calls as well. We can also compute actual liveness and narrow down the set of saved registers to be as small as possible.  *)
 
+(* TODO brady: this pass can and should be redone soon. now that all local vars are renamed, the only thing that can overwrite values is this function itself. we can analyze the function being called to see if it ever ends up calling this one. if it doesn't then no need to save. *)
+
 let rec uncover_register_expr = function
   | Register_func_instrs.Register r -> Rset.singleton r
   | Num _ | Bool _ -> Rset.empty
@@ -68,7 +70,7 @@ let compile_block ~live_registers (block : Register_func_instrs.block) =
     control_flow = block.control_flow;
   }
 
-let compile { Register_func_instrs.functions; main } =
+let compile { Register_func_instrs.functions; main; registers } =
   let compiled_functions =
     Map.mapi functions ~f:(fun ~key:_ ~data:def ->
         let live_registers =
@@ -86,4 +88,5 @@ let compile { Register_func_instrs.functions; main } =
   {
     Register_func_instrs_with_call_liveness.functions = compiled_functions;
     main = List.map main ~f:(compile_block ~live_registers:main_live_registers);
+    registers;
   }
