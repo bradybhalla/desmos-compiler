@@ -96,10 +96,7 @@ let check_stmts ~global_vars ~parent_vars =
   in
   helper ~parent_vars ~cur_vars:Register.Set.empty
 
-let compile
-    ({ functions; main; info = `Unchecked } :
-      [ `Unchecked ] C_style_separated_functions.t) :
-    [ `Checked_variable_scopes ] C_style_separated_functions.t Or_error.t =
+let compile { C_style_separated_functions.functions; main; info = `Unchecked } =
   let open Or_error.Let_syntax in
   let%bind global_vars =
     check_stmts ~global_vars:Register.Set.empty ~parent_vars:Register.Set.empty

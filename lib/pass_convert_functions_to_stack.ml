@@ -37,12 +37,10 @@ let compile_control_flow = function
   | Exit -> Exit
 
 let compile_stmt
-    ~(functions :
-       Register_func_instrs_with_call_liveness.function_def Function_name.Map.t)
-    =
+    ~(functions : Register_func_instrs.function_def Function_name.Map.t) =
   let open Register_stack_instrs in
   function
-  | Register_func_instrs_with_call_liveness.Set (reg, expr) ->
+  | Register_func_instrs.Set (reg, expr) ->
       [ GeneralizedSet [ (reg, Set (compile_expr expr)) ] ]
   | Call { func_name; args; ret; live_registers } ->
       let need_to_save_registers = Rset.of_list live_registers in

@@ -3,6 +3,8 @@ open! Desmos_compiler
 open! Languages
 open! Types
 
+(* TODO important: delete soon *)
+
 let%expect_test "registers before and after call show up as live" =
   let prog : Register_func_instrs.t =
     let open Register_func_instrs in

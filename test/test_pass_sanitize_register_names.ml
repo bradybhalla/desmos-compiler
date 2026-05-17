@@ -34,7 +34,7 @@ let%expect_test "sanitize register names" =
       info = `Unsanitized;
     }
   in
-  Pass_sanitize_register_names.compile input
+  Passes.sanitize_register_names input
   |> [%sexp_of: [ `Sanitized ] t] |> print_s;
   [%expect
     {|

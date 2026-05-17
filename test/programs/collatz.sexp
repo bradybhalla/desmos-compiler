@@ -2,8 +2,7 @@
 (def nextInSequence (n) (
     (return (??
         ((n % 2) == 0) (n / 2)
-        default ((3 * n) + 1)
-    ))
+        default ((3 * n) + 1)))
 ))
 
 (def max (a b) (

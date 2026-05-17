@@ -4,10 +4,9 @@ open! Languages
 open! Types
 
 let compile str =
-  str |> Utils.read_from_str |> Pass_check_function_defs.compile |> ok_exn
-  |> Pass_extract_function_calls_and_defs.compile
-  |> Pass_check_variable_scopes.compile |> ok_exn
-  |> Pass_rename_local_variables.compile
+  str |> Utils.read_from_str |> Passes.check_function_defs |> ok_exn
+  |> Passes.extract_function_calls_and_defs |> Passes.check_variables_scopes
+  |> ok_exn |> Passes.rename_local_variables
 
 let%expect_test "rename local variables" =
   compile

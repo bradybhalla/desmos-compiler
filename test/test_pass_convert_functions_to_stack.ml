@@ -35,8 +35,8 @@ let%expect_test "register saving and restoring at a call site" =
       registers = Register.Set.empty;
     }
   in
-  prog |> Pass_convert_functions_to_stack.compile
-  |> Register_stack_instrs.sexp_of_t |> print_s;
+  prog |> Passes.convert_functions_to_stack |> Register_stack_instrs.sexp_of_t
+  |> print_s;
   [%expect
     {|
     (((label main)

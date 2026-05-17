@@ -5,8 +5,8 @@ open! Types
 
 let print_result stmts =
   { stmts; info = `Unchecked }
-  |> Pass_check_function_defs.compile |> ok_exn
-  |> Pass_extract_function_calls_and_defs.compile
+  |> Passes.check_function_defs |> ok_exn
+  |> Passes.extract_function_calls_and_defs
   |> [%sexp_of: [ `Unchecked ] C_style_separated_functions.t] |> print_s
 
 let%expect_test "toplevel function defs extracted correctly" =

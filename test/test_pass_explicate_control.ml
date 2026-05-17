@@ -1,7 +1,7 @@
 open! Core
 open! Desmos_compiler
-open! Languages
-open! Types
+open Languages
+open Types
 
 let%expect_test "if" =
   let prog : C_style_registers.t =
@@ -18,8 +18,7 @@ let%expect_test "if" =
       registers = Register.Set.empty;
     }
   in
-  prog |> Pass_explicate_control.compile |> Register_func_instrs.sexp_of_t
-  |> print_s;
+  prog |> Passes.explicate_control |> Register_func_instrs.sexp_of_t |> print_s;
   [%expect
     {|
     ((functions ())
@@ -59,8 +58,7 @@ let%expect_test "if / elif" =
       registers = Register.Set.empty;
     }
   in
-  prog |> Pass_explicate_control.compile |> Register_func_instrs.sexp_of_t
-  |> print_s;
+  prog |> Passes.explicate_control |> Register_func_instrs.sexp_of_t |> print_s;
   [%expect
     {|
     ((functions ())
@@ -102,8 +100,7 @@ let%expect_test "if / else" =
       registers = Register.Set.empty;
     }
   in
-  prog |> Pass_explicate_control.compile |> Register_func_instrs.sexp_of_t
-  |> print_s;
+  prog |> Passes.explicate_control |> Register_func_instrs.sexp_of_t |> print_s;
   [%expect
     {|
     ((functions ())
@@ -145,8 +142,7 @@ let%expect_test "if / elif / else" =
       registers = Register.Set.empty;
     }
   in
-  prog |> Pass_explicate_control.compile |> Register_func_instrs.sexp_of_t
-  |> print_s;
+  prog |> Passes.explicate_control |> Register_func_instrs.sexp_of_t |> print_s;
   [%expect
     {|
     ((functions ())
@@ -207,8 +203,7 @@ let%expect_test "function where all branches return (nested if)" =
       registers = Register.Set.empty;
     }
   in
-  prog |> Pass_explicate_control.compile |> Register_func_instrs.sexp_of_t
-  |> print_s;
+  prog |> Passes.explicate_control |> Register_func_instrs.sexp_of_t |> print_s;
   [%expect
     {|
     ((functions
@@ -259,8 +254,7 @@ let%expect_test "while loop" =
       registers = Register.Set.empty;
     }
   in
-  prog |> Pass_explicate_control.compile |> Register_func_instrs.sexp_of_t
-  |> print_s;
+  prog |> Passes.explicate_control |> Register_func_instrs.sexp_of_t |> print_s;
   [%expect
     {|
     ((functions ())

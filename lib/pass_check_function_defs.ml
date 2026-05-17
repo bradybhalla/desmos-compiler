@@ -74,8 +74,7 @@ let check_function_returns func_name stmts =
   if%bind helper stmts then Ok ()
   else error_s [%sexp "function missing return", (func_name : Function_name.t)]
 
-let compile ({ stmts; info = `Unchecked } : [ `Unchecked ] C_style_frontend.t) :
-    [ `Checked_function_defs ] C_style_frontend.t Or_error.t =
+let compile { stmts; info = `Unchecked } =
   let open Or_error.Let_syntax in
   (* get function definitions and make sure they are only in the toplevel. also
      make sure there are no returns in the toplevel. *)

@@ -142,51 +142,9 @@ module Register_func_instrs = struct
   [@@deriving sexp]
 end
 
-module Register_func_instrs_with_call_liveness = struct
-  (* TODO brady: maybe we can change this to use the same parameterized type as
-     the previous language? it is kind of annoying to have a whole separate
-     language that doesn't really change anything except a single record field
-     *)
-  type expr = Register_func_instrs.expr [@@deriving sexp]
-  type control_flow = Register_func_instrs.control_flow [@@deriving sexp]
-
-  type stmt =
-    | Set of Register.t * expr
-    | Call of {
-        func_name : Function_name.t;
-        args : expr list;
-        ret : Register.t option;
-        live_registers : Register.t list;
-      }
-  [@@deriving sexp]
-
-  type block = {
-    label : Label.t;
-    body : stmt list;
-    control_flow : control_flow;
-  }
-  [@@deriving sexp]
-
-  type function_def = {
-    entry_label : Label.t;
-    params : Register.t list;
-    blocks : block list;
-  }
-  [@@deriving sexp]
-
-  type t = {
-    functions : function_def Function_name.Map.t;
-    main : block list;
-    registers : Register.Set.t;
-  }
-  [@@deriving sexp]
-end
-
 (** Register-based instruction set that has a per-register stack (instead of
     functions). *)
 module Register_stack_instrs = struct
-  (* TODO brady: maybe make this per-function? *)
-
   type expr =
     | Register of Register.t
     | Num of float
@@ -269,6 +227,10 @@ module Desmos_virtual_machine = struct
 
   type block = { label : Label.t; body : stmt list } [@@deriving sexp]
   type 'a t = { main : block list; info : 'a } [@@deriving sexp]
+
+  module Initial_registers = struct
+    type t = expr Types.Register.Map.t [@@deriving sexp]
+  end
 end
 
 module Desmos_output = Lang_desmos_output

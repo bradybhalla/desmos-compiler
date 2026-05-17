@@ -7,8 +7,7 @@ open! Desmos_virtual_machine
 (* this also runs sanitize registers in order to print js output but that is a pretty trivial pass so it should be fine *)
 
 let compile prog =
-  prog |> Pass_generate_desmos_output.compile
-  |> Pass_sanitize_register_names.compile
+  prog |> Passes.generate_desmos_output |> Passes.sanitize_register_names
 
 let print_sexp compiled =
   compiled |> [%sexp_of: [ `Sanitized ] Desmos_output.t] |> print_s

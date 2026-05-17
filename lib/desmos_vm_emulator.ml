@@ -17,6 +17,7 @@ type t = {
   mutable program_counter : int;
 }
 
+(* TODO brady: support datatypes explicitly instead of converting to num *)
 let evaluate_initial_register_value = function
   | Num n -> n
   | Bool b -> if b then 1. else 0.
@@ -139,3 +140,5 @@ let run_until_done vm_prog =
   let t = create vm_prog in
   let rec loop () = match step t with `Done -> t | `Not_done -> loop () in
   loop ()
+
+let inspect_register t reg = Hashtbl.find_exn t.registers reg
