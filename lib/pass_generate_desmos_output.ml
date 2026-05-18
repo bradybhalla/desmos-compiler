@@ -1,6 +1,6 @@
 open! Core
-open! Languages
-open! Types
+open Languages
+open Types
 open Desmos_output
 
 let build_label_map blocks =
@@ -89,7 +89,7 @@ let compile_stmt label_map idx stmt =
       in
       [ (pc_eq_i, reg_sets) ]
 
-let compile (program : _ Desmos_virtual_machine.t) =
+let compile (program : Desmos_virtual_machine.t) =
   let label_map = build_label_map program.main in
   let _, conds =
     List.fold_left program.main ~init:(0, []) ~f:(fun (idx, acc) block ->
@@ -104,7 +104,7 @@ let compile (program : _ Desmos_virtual_machine.t) =
     { conds; default = [ (program_counter_reg, Register program_counter_reg) ] }
   in
   let init_registers =
-    Map.to_alist program.info
+    Map.to_alist program.registers
     |> List.concat_map ~f:(fun (reg, init_expr) ->
            [
              (reg, compile_expr label_map init_expr);

@@ -1,7 +1,6 @@
 open! Core
-open! Desmos_compiler
-open! Languages
-open! Types
+open Desmos_compiler
+open Languages
 
 let%expect_test "parse a simple program" =
   let ast = Utils.read_from_file "programs/basic_language_features.sexp" in

@@ -1,7 +1,7 @@
 open! Core
-open! Desmos_compiler
-open! Languages
-open! Types
+open Desmos_compiler
+open Languages
+open Types
 
 let read_from_file file = file |> Sexp.load_sexps |> C_style_frontend.parse_ast
 let read_from_str str = str |> Sexp.of_string_many |> C_style_frontend.parse_ast
@@ -11,7 +11,6 @@ let compile_frontend_to_vm prog =
   |> Passes.extract_function_calls_and_defs |> Passes.check_variables_scopes
   |> ok_exn |> Passes.rename_local_variables |> Passes.explicate_control
   |> Passes.convert_functions_to_stack |> Passes.make_program_counter_explicit
-  |> Passes.prepare_registers
 
 let compile_vm_to_javascript prog =
   prog |> Passes.generate_desmos_output |> Passes.sanitize_register_names

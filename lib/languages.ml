@@ -74,13 +74,17 @@ module C_style_registers = struct
       }
   [@@deriving sexp]
 
-  type function_def = { params : Register.t list; body : stmt list }
+  type function_def = {
+    params : Register.t list;
+    body : stmt list;
+    local_registers : Register.Set.t;
+  }
   [@@deriving sexp]
 
   type t = {
     functions : function_def Function_name.Map.t;
     main : stmt list;
-    registers : Register.Set.t;
+    global_registers : Register.Set.t;
   }
   [@@deriving sexp]
 end
@@ -131,13 +135,14 @@ module Register_func_instrs = struct
     entry_label : Label.t;
     params : Register.t list;
     blocks : block list;
+    local_registers : Register.Set.t;
   }
   [@@deriving sexp]
 
   type t = {
     functions : function_def Function_name.Map.t;
     main : block list;
-    registers : Register.Set.t;
+    global_registers : Register.Set.t;
   }
   [@@deriving sexp]
 end
@@ -188,7 +193,7 @@ module Register_stack_instrs = struct
   }
   [@@deriving sexp]
 
-  type t = block list [@@deriving sexp]
+  type t = { blocks : block list; registers : Register.Set.t } [@@deriving sexp]
 end
 
 (** Register-based instruction set where each instruction is a list of register
@@ -226,11 +231,9 @@ module Desmos_virtual_machine = struct
   [@@deriving sexp]
 
   type block = { label : Label.t; body : stmt list } [@@deriving sexp]
-  type 'a t = { main : block list; info : 'a } [@@deriving sexp]
 
-  module Initial_registers = struct
-    type t = expr Types.Register.Map.t [@@deriving sexp]
-  end
+  type t = { main : block list; registers : expr Register.Map.t }
+  [@@deriving sexp]
 end
 
 module Desmos_output = Lang_desmos_output

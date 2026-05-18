@@ -1,20 +1,46 @@
 open! Core
-open! Desmos_compiler
-open! Languages
-open! Types
+open Desmos_compiler
+open Languages
+open Types
 
 let%expect_test "register saving and restoring at a call site" =
-  let prog : Register_func_instrs_with_call_liveness.t =
-    let open Register_func_instrs_with_call_liveness in
+  let prog : Register_func_instrs.t =
+    let open Register_func_instrs in
     let f = Function_name.of_string "f" in
     let f_label = Label.of_string "f" in
     let x = Register.of_string "x" in
     let y = Register.of_string "y" in
     let z = Register.of_string "z" in
+    let a = Register.of_string "a" in
+    let local_y = Register.of_string "local_y" in
+    let local_z = Register.of_string "local_z" in
     {
       functions =
         Function_name.Map.of_alist_exn
-          [ (f, { entry_label = f_label; params = [ y; z ]; blocks = [] }) ];
+          [
+            ( f,
+              {
+                entry_label = f_label;
+                params = [ local_y; local_z ];
+                blocks =
+                  [
+                    {
+                      label = Label.of_string "func_entry";
+                      body =
+                        [
+                          Call
+                            {
+                              func_name = f;
+                              args = [ Register local_z; Register local_y ];
+                              ret = Some local_z;
+                            };
+                        ];
+                      control_flow = Exit;
+                    };
+                  ];
+                local_registers = Register.Set.of_list [ local_y; local_z ];
+              } );
+          ];
       main =
         [
           {
@@ -24,15 +50,14 @@ let%expect_test "register saving and restoring at a call site" =
                 Call
                   {
                     func_name = f;
-                    args = [ Register y; Register x ];
-                    ret = Some (Register.of_string "a");
-                    live_registers = [ x; y; z ];
+                    args = [ Register y; Register z ];
+                    ret = Some a;
                   };
               ];
             control_flow = Exit;
           };
         ];
-      registers = Register.Set.empty;
+      global_registers = Register.Set.of_list [ x; y; a ];
     }
   in
   prog |> Passes.convert_functions_to_stack |> Register_stack_instrs.sexp_of_t

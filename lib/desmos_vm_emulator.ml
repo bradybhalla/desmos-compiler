@@ -1,6 +1,6 @@
 open! Core
-open! Languages
-open! Types
+open Languages
+open Types
 open Desmos_virtual_machine
 module RegHashtbl = Hashtbl.Make (Register)
 
@@ -32,11 +32,11 @@ let evaluate_initial_register_value = function
   | Compare (_, _, _) ->
       failwith "initial expression should be a constant"
 
-let create program =
+let create (program : Desmos_virtual_machine.t) =
   (* initialize registers *)
   let registers = RegHashtbl.create () in
   let register_stacks = RegHashtbl.create () in
-  Map.iteri program.info ~f:(fun ~key:r ~data:init_expr ->
+  Map.iteri program.registers ~f:(fun ~key:r ~data:init_expr ->
       Hashtbl.add_exn registers ~key:r
         ~data:(evaluate_initial_register_value init_expr);
       Hashtbl.add_exn register_stacks ~key:r ~data:[]);

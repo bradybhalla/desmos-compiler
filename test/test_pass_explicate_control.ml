@@ -1,5 +1,5 @@
 open! Core
-open! Desmos_compiler
+open Desmos_compiler
 open Languages
 open Types
 
@@ -15,7 +15,7 @@ let%expect_test "if" =
           If { branches = [ (Bool true, [ Set (x, Num 1.) ]) ]; else_ = [] };
           Set (x, Num 1.);
         ];
-      registers = Register.Set.empty;
+      global_registers = Register.Set.empty;
     }
   in
   prog |> Passes.explicate_control |> Register_func_instrs.sexp_of_t |> print_s;
@@ -55,7 +55,7 @@ let%expect_test "if / elif" =
             };
           Set (x, Num 1.);
         ];
-      registers = Register.Set.empty;
+      global_registers = Register.Set.empty;
     }
   in
   prog |> Passes.explicate_control |> Register_func_instrs.sexp_of_t |> print_s;
@@ -97,7 +97,7 @@ let%expect_test "if / else" =
             };
           Set (x, Num 1.);
         ];
-      registers = Register.Set.empty;
+      global_registers = Register.Set.empty;
     }
   in
   prog |> Passes.explicate_control |> Register_func_instrs.sexp_of_t |> print_s;
@@ -139,7 +139,7 @@ let%expect_test "if / elif / else" =
               else_ = [ Set (x, Num 3.) ];
             };
         ];
-      registers = Register.Set.empty;
+      global_registers = Register.Set.empty;
     }
   in
   prog |> Passes.explicate_control |> Register_func_instrs.sexp_of_t |> print_s;
@@ -197,10 +197,11 @@ let%expect_test "function where all branches return (nested if)" =
                           ];
                       };
                   ];
+                local_registers = Register.Set.empty;
               } );
           ];
       main = [];
-      registers = Register.Set.empty;
+      global_registers = Register.Set.empty;
     }
   in
   prog |> Passes.explicate_control |> Register_func_instrs.sexp_of_t |> print_s;
@@ -251,7 +252,7 @@ let%expect_test "while loop" =
             };
           Set (x, Num 1.);
         ];
-      registers = Register.Set.empty;
+      global_registers = Register.Set.empty;
     }
   in
   prog |> Passes.explicate_control |> Register_func_instrs.sexp_of_t |> print_s;

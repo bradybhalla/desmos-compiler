@@ -1,6 +1,6 @@
 open! Core
-open! Languages
-open! Types
+open Languages
+open Types
 open C_style_frontend
 
 let extract_function_defs stmts =

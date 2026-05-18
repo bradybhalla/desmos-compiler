@@ -1,6 +1,6 @@
 open! Core
-open! Languages
-open! Types
+open Languages
+open Types
 
 (* TODO: this pass got kind of complicated because I wanted to have the blocks work a certain way for future optimizations. hopefully it actually works otherwise I made it more annoying than I had to for nothing. *)
 
@@ -157,12 +157,12 @@ let rec compile_statements ~cur_label ~default_next ~stmts_rev ~blocks_rev =
           compile_statements ~cur_label ~default_next
             ~stmts_rev:(stmt :: stmts_rev) ~blocks_rev rest)
 
-let compile C_style_registers.{ functions; main; registers } =
+let compile C_style_registers.{ functions; main; global_registers } =
   Label_generator.reset label_gen;
   Register_func_instrs.
     {
       functions =
-        Map.map functions ~f:(fun { params; body } ->
+        Map.map functions ~f:(fun { params; body; local_registers } ->
             let entry_label =
               Label_generator.generate ~desc:"function_entry" label_gen
             in
@@ -170,10 +170,10 @@ let compile C_style_registers.{ functions; main; registers } =
               compile_statements ~cur_label:entry_label ~default_next:None
                 ~stmts_rev:[] ~blocks_rev:[] body
             in
-            { entry_label; params; blocks });
+            { entry_label; params; blocks; local_registers });
       main =
         (let entry_label = Label_generator.generate ~desc:"main" label_gen in
          compile_statements ~cur_label:entry_label ~default_next:(Some Exit)
            ~stmts_rev:[] ~blocks_rev:[] main);
-      registers;
+      global_registers;
     }

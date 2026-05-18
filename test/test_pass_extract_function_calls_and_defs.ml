@@ -1,7 +1,7 @@
 open! Core
-open! Desmos_compiler
-open! Languages
-open! Types
+open Desmos_compiler
+open Languages
+open Types
 
 let print_result stmts =
   { stmts; info = `Unchecked }

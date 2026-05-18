@@ -1,7 +1,7 @@
 open! Core
-open! Desmos_compiler
-open! Languages
-open! Types
+open Desmos_compiler
+open Languages
+open Types
 open Desmos_output
 
 let%expect_test "sanitize register names" =

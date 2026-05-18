@@ -1,6 +1,6 @@
 (executable
  (public_name desmos-compiler)
  (name main)
- (libraries desmos_compiler core)
+ (libraries desmos_compiler core core_unix.command_unix)
  (preprocess
   (pps ppx_jane)))

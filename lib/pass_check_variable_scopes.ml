@@ -1,6 +1,6 @@
 open! Core
-open! Languages
-open! Types
+open Languages
+open Types
 
 (* make sure vars are only used after being declared and that all varaibles are in scope.  *)
 

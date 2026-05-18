@@ -1,8 +1,8 @@
 open! Core
-open! Desmos_compiler
-open! Languages
-open! Types
-open! Desmos_virtual_machine
+open Desmos_compiler
+open Languages
+open Types
+open Desmos_virtual_machine
 
 (* this also runs sanitize registers in order to print js output but that is a pretty trivial pass so it should be fine *)
 
@@ -20,7 +20,7 @@ let%expect_test "0 instructions" =
     compile
       {
         main = [ { label = Label.of_string "main"; body = [] } ];
-        info = Register.Map.of_alist_exn [ (program_counter_reg, Num 0.) ];
+        registers = Register.Map.of_alist_exn [ (program_counter_reg, Num 0.) ];
       }
   in
   print_sexp prog;
@@ -52,7 +52,7 @@ let%expect_test "multiple instructions" =
                 ];
             };
           ];
-        info =
+        registers =
           Register.Map.of_alist_exn
             [ (program_counter_reg, Num 0.); (a, Num 0.); (b, Num 0.) ];
       }
@@ -101,7 +101,7 @@ let%expect_test "push and pop" =
                 ];
             };
           ];
-        info =
+        registers =
           Register.Map.of_alist_exn
             [
               (program_counter_reg, Num 0.);
@@ -173,7 +173,7 @@ let%expect_test "nested if_expr" =
                 ];
             };
           ];
-        info =
+        registers =
           Register.Map.of_alist_exn
             [ (program_counter_reg, Num 0.); (a, Num 0.) ];
       }

@@ -4,7 +4,7 @@ module Types : module type of Types
 module Languages : module type of Languages
 
 module Passes : sig
-  open! Languages
+  open Languages
 
   val check_function_defs :
     [ `Unchecked ] C_style_frontend.t ->
@@ -49,22 +49,13 @@ module Passes : sig
   *)
 
   val make_program_counter_explicit :
-    Register_stack_instrs.t -> unit Desmos_virtual_machine.t
+    Register_stack_instrs.t -> Desmos_virtual_machine.t
   (** Treat the program counter as a normal register which needs to be manually
-      updated at every step. *)
-
-  val prepare_registers :
-    unit Desmos_virtual_machine.t ->
-    Desmos_virtual_machine.Initial_registers.t Desmos_virtual_machine.t
-  (** Find which registers are needed and what their initial values should be.
-      For now every register starts at 1.2345 except the program counter so it
-      will hopefully be easier to detect bugs if a value is never set.
-
-      TODO: this should be removed later *)
+      updated at every step. Sets initial values for all registers to 1.0 except
+      the program counter which is set to 0. *)
 
   val generate_desmos_output :
-    Desmos_virtual_machine.Initial_registers.t Desmos_virtual_machine.t ->
-    [ `Unsanitized ] Desmos_output.t
+    Desmos_virtual_machine.t -> [ `Unsanitized ] Desmos_output.t
   (** Turn the virtual machine language into a representation of actual Desmos
       expressions. *)
 
@@ -78,14 +69,9 @@ module Desmos_vm_emulator : sig
 
   type t
 
-  val create :
-    Desmos_virtual_machine.Initial_registers.t Desmos_virtual_machine.t -> t
-
+  val create : Desmos_virtual_machine.t -> t
   val step : t -> [ `Done | `Not_done ]
-
-  val run_until_done :
-    Desmos_virtual_machine.Initial_registers.t Desmos_virtual_machine.t -> t
-
+  val run_until_done : Desmos_virtual_machine.t -> t
   val inspect_register : t -> Register.t -> float
 end
 

@@ -1,6 +1,6 @@
 open! Core
-open! Languages
-open! Types
+open Languages
+open Types
 open Desmos_output
 
 let build_rename_map init_registers =

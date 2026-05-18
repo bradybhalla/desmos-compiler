@@ -1,7 +1,5 @@
 open! Core
-open! Desmos_compiler
-open! Languages
-open! Types
+open Desmos_compiler
 
 let check str =
   match

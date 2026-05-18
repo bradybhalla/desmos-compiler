@@ -1,6 +1,6 @@
 open! Core
-open! Languages
-open! Types
+open Languages
+open Types
 
 (* make sure vars are only used after being declared and that all varaibles are in scope.  *)
 
@@ -40,17 +40,17 @@ let compile
     C_style_registers.t =
   let register_gen = Register_generator.create "rename_local_vars" in
   Register_generator.reset register_gen;
-  let all_registers = Register.Hash_set.create () in
-  let create_register () =
+  let global_registers = Register.Hash_set.create () in
+  let create_register ~local_set () =
     let reg = Register_generator.generate register_gen in
-    Hash_set.add all_registers reg;
+    Hash_set.add local_set reg;
     reg
   in
   let register_global reg =
-    Hash_set.add all_registers reg;
+    Hash_set.add global_registers reg;
     reg
   in
-  let rec rename_in_stmts ~parent_names ~is_global stmts =
+  let rec rename_in_stmts ~parent_names ~is_global ~local_set stmts =
     let helper ~cur_names =
       let combined_names = merge_override parent_names cur_names in
       let renamed = Map.find_exn combined_names in
@@ -58,7 +58,8 @@ let compile
       function
       | C_style_separated_functions.Decl reg ->
           let new_reg =
-            if is_global then register_global reg else create_register ()
+            if is_global then register_global reg
+            else create_register ~local_set ()
           in
           let cur_names = Map.add_exn cur_names ~key:reg ~data:new_reg in
           ([], cur_names)
@@ -70,11 +71,11 @@ let compile
                     List.map branches ~f:(fun (cond, body) ->
                         ( rename_in_expr ~renamed cond,
                           rename_in_stmts ~parent_names:child_scope_parent_names
-                            ~is_global:false body
+                            ~is_global:false ~local_set body
                           |> fst ));
                   else_ =
                     rename_in_stmts ~parent_names:child_scope_parent_names
-                      ~is_global:false else_
+                      ~is_global:false ~local_set else_
                     |> fst;
                 };
             ],
@@ -86,7 +87,7 @@ let compile
                   cond = rename_in_expr ~renamed cond;
                   body =
                     rename_in_stmts ~parent_names:child_scope_parent_names
-                      ~is_global:false body
+                      ~is_global:false ~local_set body
                     |> fst;
                 };
             ],
@@ -111,21 +112,31 @@ let compile
       ~init:([], Register.Map.empty)
   in
   let main, global_names =
-    rename_in_stmts ~parent_names:Register.Map.empty ~is_global:true main
+    rename_in_stmts ~parent_names:Register.Map.empty ~is_global:true
+      ~local_set:global_registers main
   in
   {
     main;
     functions =
       Map.map functions ~f:(fun { params; body } ->
+          let func_registers = Register.Hash_set.create () in
           let param_names =
             List.fold params ~init:Register.Map.empty ~f:(fun map reg ->
-                Map.add_exn map ~key:reg ~data:(create_register ()))
+                Map.add_exn map ~key:reg
+                  ~data:(create_register ~local_set:func_registers ()))
           in
           let parent_names = merge_override global_names param_names in
+          let params_renamed = List.map params ~f:(Map.find_exn param_names) in
+          let body_compiled =
+            rename_in_stmts ~parent_names ~is_global:false
+              ~local_set:func_registers body
+            |> fst
+          in
+          let local_registers = Register.Set.of_hash_set func_registers in
           {
-            C_style_registers.params =
-              List.map params ~f:(Map.find_exn param_names);
-            body = rename_in_stmts ~parent_names ~is_global:false body |> fst;
+            C_style_registers.params = params_renamed;
+            body = body_compiled;
+            local_registers;
           });
-    registers = Register.Set.of_hash_set all_registers;
+    global_registers = Register.Set.of_hash_set global_registers;
   }

@@ -1,7 +1,4 @@
 open! Core
-open! Desmos_compiler
-open! Languages
-open! Types
 
 let%expect_test "basic features" =
   Utils.read_from_file "programs/basic_language_features.sexp"

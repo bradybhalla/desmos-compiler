@@ -1,6 +1,6 @@
 open! Core
-open! Languages
-open! Types
+open Languages
+open Types
 module Rset = Register.Set
 
 let rec compile_expr = function
@@ -37,19 +37,27 @@ let compile_control_flow = function
   | Exit -> Exit
 
 let compile_stmt
-    ~(functions : Register_func_instrs.function_def Function_name.Map.t) =
+    ~(functions : Register_func_instrs.function_def Function_name.Map.t)
+    ~current_function =
   let open Register_stack_instrs in
   function
   | Register_func_instrs.Set (reg, expr) ->
       [ GeneralizedSet [ (reg, Set (compile_expr expr)) ] ]
-  | Call { func_name; args; ret; live_registers } ->
-      let need_to_save_registers = Rset.of_list live_registers in
+  | Call { func_name; args; ret } ->
+      (* we need to save local registers if we are currently inside a function because we might end up in a recursive call. Functions have disjoint sets of registers so this is the only case where it matters. *)
+      (* TODO brady: we could make this more efficient by checking if we actually have the potential for a recursive call *)
+      let need_to_save_registers =
+        Option.value_map current_function ~default:Rset.empty ~f:(fun func ->
+            (Map.find_exn functions func).local_registers)
+      in
       let func_info = Map.find_exn functions func_name in
+      (* registers used to pass in arguments *)
       let arg_registers = func_info.params in
       let arg_registers_and_values =
         args |> List.map ~f:compile_expr |> List.zip_exn arg_registers
       in
       let save_registers_and_set_args =
+        (* set argument registers and possible save them to stack if they are live *)
         let set_args =
           List.map
             ~f:(fun (reg, expr) ->
@@ -58,6 +66,7 @@ let compile_stmt
             arg_registers_and_values
         in
         let save_remaining_clobbered =
+          (* save other live registers that aren't used for arguments *)
           Set.diff need_to_save_registers (Rset.of_list arg_registers)
           |> Set.to_list
           |> List.map ~f:(fun r -> (r, Push))
@@ -84,23 +93,25 @@ let compile_stmt
       [ save_registers_and_set_args; call_function; restore_registers ]
       @ store_result
 
-let compile_function_def ~functions ((_ : Function_name.t), def) =
-  let open Register_func_instrs_with_call_liveness in
+let compile_function_def ~functions (func_name, def) =
+  let open Register_func_instrs in
   List.map def.blocks ~f:(fun block ->
       {
         Register_stack_instrs.label = block.label;
-        body = List.concat_map block.body ~f:(compile_stmt ~functions);
+        body =
+          List.concat_map block.body
+            ~f:(compile_stmt ~functions ~current_function:(Some func_name));
         control_flow = compile_control_flow block.control_flow;
       })
 
-(* TODO important: finish propagating registers down *)
-let compile
-    { Register_func_instrs_with_call_liveness.functions; main; registers = _ } =
+let compile { Register_func_instrs.functions; main; global_registers } =
   let main_blocks =
     List.map main ~f:(fun block ->
         {
           Register_stack_instrs.label = block.label;
-          body = List.concat_map block.body ~f:(compile_stmt ~functions);
+          body =
+            List.concat_map block.body
+              ~f:(compile_stmt ~functions ~current_function:None);
           control_flow = compile_control_flow block.control_flow;
         })
   in
@@ -109,4 +120,12 @@ let compile
     |> List.concat_map ~f:(fun (name, def) ->
            compile_function_def ~functions (name, def))
   in
-  main_blocks @ function_blocks
+  let combined_registers =
+    Map.fold functions ~init:global_registers ~f:(fun ~key:_ ~data:def acc ->
+        Set.union acc def.local_registers)
+    |> Set.union (Rset.of_list [ link_register; return_register ])
+  in
+  {
+    Register_stack_instrs.blocks = main_blocks @ function_blocks;
+    registers = combined_registers;
+  }

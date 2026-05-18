@@ -1,28 +1,34 @@
 open! Core
-open! Desmos_compiler
-open! Languages
-open! Types
+open Desmos_compiler
+open Languages
+open Types
+
+let compile prog =
+  prog |> Passes.make_program_counter_explicit
+  |> Desmos_virtual_machine.sexp_of_t |> print_s
 
 let%expect_test "normal instructions compile correctly" =
   let prog : Register_stack_instrs.t =
     let open Register_stack_instrs in
     let a = Register.of_string "a" in
-    [
-      {
-        label = Label.of_string "normal_instrs";
-        body =
-          [
-            GeneralizedSet [ (a, Set (Num 5.)) ];
-            GeneralizedSet
-              [ (Register.of_string "b", Set (Add (Register a, Num 1.))) ];
-          ];
-        control_flow = Exit;
-      };
-    ]
+    {
+      blocks =
+        [
+          {
+            label = Label.of_string "normal_instrs";
+            body =
+              [
+                GeneralizedSet [ (a, Set (Num 5.)) ];
+                GeneralizedSet
+                  [ (Register.of_string "b", Set (Add (Register a, Num 1.))) ];
+              ];
+            control_flow = Exit;
+          };
+        ];
+      registers = Register.Set.empty;
+    }
   in
-  prog |> Passes.make_program_counter_explicit
-  |> Desmos_virtual_machine.sexp_of_t sexp_of_unit
-  |> print_s;
+  compile prog;
   [%expect
     {|
     ((main
@@ -40,27 +46,31 @@ let%expect_test "normal instructions compile correctly" =
 let%expect_test "jump compiles correctly" =
   let prog : Register_stack_instrs.t =
     let open Register_stack_instrs in
-    [
-      {
-        label = Label.of_string "conditional_jump";
-        body = [];
-        control_flow =
-          Jump
-            {
-              conds =
-                [
-                  ( Compare
-                      (Compare_op.Eq, Register (Register.of_string "c"), Num 0.),
-                    Label.of_string "target" );
-                ];
-              default = Label.of_string "default";
-            };
-      };
-    ]
+    {
+      blocks =
+        [
+          {
+            label = Label.of_string "conditional_jump";
+            body = [];
+            control_flow =
+              Jump
+                {
+                  conds =
+                    [
+                      ( Compare
+                          ( Compare_op.Eq,
+                            Register (Register.of_string "c"),
+                            Num 0. ),
+                        Label.of_string "target" );
+                    ];
+                  default = Label.of_string "default";
+                };
+          };
+        ];
+      registers = Register.Set.empty;
+    }
   in
-  prog |> Passes.make_program_counter_explicit
-  |> Desmos_virtual_machine.sexp_of_t sexp_of_unit
-  |> print_s;
+  compile prog;
   [%expect
     {|
     ((main
@@ -79,21 +89,23 @@ let%expect_test "jump compiles correctly" =
 let%expect_test "JumpLink compiles correctly" =
   let prog : Register_stack_instrs.t =
     let open Register_stack_instrs in
-    [
-      {
-        label = Label.of_string "jumplink_test";
-        body =
-          [
-            GeneralizedSet [ (Register.of_string "a", Set (Num 1.)) ];
-            JumpLink (Label.of_string "func");
-          ];
-        control_flow = Exit;
-      };
-    ]
+    {
+      blocks =
+        [
+          {
+            label = Label.of_string "jumplink_test";
+            body =
+              [
+                GeneralizedSet [ (Register.of_string "a", Set (Num 1.)) ];
+                JumpLink (Label.of_string "func");
+              ];
+            control_flow = Exit;
+          };
+        ];
+      registers = Register.Set.empty;
+    }
   in
-  prog |> Passes.make_program_counter_explicit
-  |> Desmos_virtual_machine.sexp_of_t sexp_of_unit
-  |> print_s;
+  compile prog;
   [%expect
     {|
     ((main
@@ -111,17 +123,19 @@ let%expect_test "JumpLink compiles correctly" =
 let%expect_test "return compiles correctly" =
   let prog : Register_stack_instrs.t =
     let open Register_stack_instrs in
-    [
-      {
-        label = Label.of_string "return_test";
-        body = [];
-        control_flow = Return (Register (Register.of_string "b"));
-      };
-    ]
+    {
+      blocks =
+        [
+          {
+            label = Label.of_string "return_test";
+            body = [];
+            control_flow = Return (Register (Register.of_string "b"));
+          };
+        ];
+      registers = Register.Set.empty;
+    }
   in
-  prog |> Passes.make_program_counter_explicit
-  |> Desmos_virtual_machine.sexp_of_t sexp_of_unit
-  |> print_s;
+  compile prog;
   [%expect
     {|
     ((main

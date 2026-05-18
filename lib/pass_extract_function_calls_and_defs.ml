@@ -1,6 +1,6 @@
 open! Core
-open! Languages
-open! Types
+open Languages
+open Types
 open C_style_frontend
 
 let register_gen = Register_generator.create "extract_function_calls"

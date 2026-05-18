@@ -1,6 +1,6 @@
 open! Core
-open! Languages
-open! Types
+open Languages
+open Types
 open Desmos_virtual_machine
 
 let rec compile_expr = function
@@ -74,5 +74,16 @@ let compile_block (block : Register_stack_instrs.block) =
   let control_flow = compile_control_flow block.control_flow in
   { Desmos_virtual_machine.label = block.label; body = body @ [ control_flow ] }
 
-let compile blocks =
-  { Desmos_virtual_machine.main = List.map blocks ~f:compile_block; info = () }
+let compile { Register_stack_instrs.blocks; registers } =
+  let initial_registers =
+    Set.add registers program_counter_reg
+    |> Set.to_map ~f:(fun reg ->
+           if Register.(reg = program_counter_reg) then
+             Desmos_virtual_machine.Num 0.
+             (* TODO important: have a better way to handle initial register values *)
+           else Num 1.2345)
+  in
+  {
+    Desmos_virtual_machine.main = List.map blocks ~f:compile_block;
+    registers = initial_registers;
+  }

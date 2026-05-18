@@ -1,7 +1,6 @@
 open! Core
-open! Desmos_compiler
-open! Languages
-open! Types
+open Desmos_compiler
+open Languages
 
 let compile str =
   str |> Utils.read_from_str |> Passes.check_function_defs |> ok_exn
