@@ -29,3 +29,7 @@ let%expect_test "short circuiting" =
 let%expect_test "variable scopes" =
   compile_and_run ~file:"programs/variable_scopes.sexp" ~reg:"y";
   [%expect {| (Ok 8) |}]
+
+let%expect_test "mutual recursion" =
+  compile_and_run ~file:"programs/mutual_recursion.sexp" ~reg:"result";
+  [%expect {| (Ok 2) |}]
