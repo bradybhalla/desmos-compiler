@@ -1,4 +1,4 @@
-# Created 2026-05-05 Tue 01:04
+# Created 2026-05-19 Tue 00:23
 #+title: Desmos compiler (CS 81)
 #+author: Brady Bhalla
 #+filetags: :course:
@@ -86,33 +86,37 @@ define local variables.
 - get rid of underscores so it can go in desmos
 - make sure the new value is always unique
 *** I will be out of town next week!!
-** Meeting 5/12
-*** TODO Revisit convert functions to stack
+** [8/14] Meeting 5/19
+*** DONE Revisit convert functions to stack
 - need to rewrite to allow for modifying global vars from functions
 - store local vars from a function only, and only if the function is called
   again somewhere
 - maybe want to track which registers each function owns?
-*** TODO Test short circuiting correctness
+*** DONE Test short circuiting correctness
 - make a big program that tests short circuiting by incrementing a global var
   every time a function executes
-*** TODO Error checking pass for function calls
-- maybe add onto function defs pass?
-*** TODO Language refactor
-- parameterize with type of register set to make adding types easier. also
-  finish propagating the register set all the way down
-- find doubly defined things and make languages reference the previous one where possible
-- Put all passes in a single mli files so they can be used and documented more easily
-*** TODO Handle vars that are used after declared but before defined
-- Should check_variable_scopes also make sure a value is initialized before
-  being used?
-*** TODO Figure out a way to do "stdin" and "stdout"
-*** TODO Add a reset button to the javascript output
-*** TODO Make an actual executable
+- programs/short_circuiting.sexp
+*** DONE language refactor: finish propagating register sets
+*** DONE More readable generated names
+used to make a whole new name. now still contains the original name which makes debugging more possible.
+*** DONE Put all passes in a single mli file
+*** DONE Add a reset button to the javascript output
+*** DONE Make an actual executable
 - input program
 - flags for which pass to start from and compile to?
 - flags for running with emulator or outputting javascript
 - eventually flags for different optimizations
+*** DONE Documentation pages
+navigate to _build/default/_doc/_html and then go to the private desmos_compiler library
+*** TODO Error checking pass for function calls
+- maybe add onto function defs pass?
+*** TODO language refactor: set up codebase to make adding types easier
+*** TODO Handle vars that are used after declared but before defined
+- Should check_variable_scopes also make sure a value is initialized before
+  being used?
+*** TODO Figure out a way to do "stdin" and "stdout"
 *** TODO Types
+*** TODO Make everything Or_error instead of failwith
 ** Future plans
 *** Lists (and lists of lists)
 - could be stored like

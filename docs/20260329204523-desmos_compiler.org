@@ -1,4 +1,4 @@
-# Created 2026-05-05 Tue 01:04
+# Created 2026-05-19 Tue 00:23
 #+title: Desmos compiler
 #+author: Brady Bhalla
 #+filetags: :project:
@@ -10,34 +10,16 @@ learned about assembly or compilers at all yet so it was pretty bad.
 
 I am working on a new version as part of a [[id:97B0001F-6FB3-47B6-9821-D0E69DC27FDD][CS 81]] project.
 * Next things to do
-** TODO WHERE I LEFT OFF
-- figure out how function popping needs to work now (I think you just need to
-  analyze if a recursive call is make, maybe need pass to pull out info)
-
-- DECL modifications
-  - right now undefined behavior to use value before setting after declaring
-  - should decl need initial value? or just a type?
-
-parameterize languages better
-
-see TODO important
-- propagate register set all the way down to the end
-
-tests for correctness
-- short circuiting
-  - and/or/ifexpr/if
-
-check that functions are called with the correct number of parameters and all
-called functions exist
-- pass
-
-- if there is an optimization that gets rid of registers then need to recompute,
-  but for now we can just keep them
-
-move list of passes to a .mli file (then I can put the
-types in directly and add documentation)
-
-make an executable for the compiler
+** Error checking passes
+- function calls have correct number of args
+- variable names are valid
+** Reset instruction
+make this yourself
+** language abstraction
+- move each language to its own file
+- uncomment languages mli definition and add comments
+- what is the deriving that makes a constructor? maybe something like fields.create?
+- expose all the create functions in a For_testing submodule
 ** types
 add types everywhere
 probably require a (decl (x : int)) form (optional init value?)
@@ -47,18 +29,16 @@ functions require type info (def f ((x : int) (y : int)) : bool)
 - typechecking pass that errors with wrong types
 - when a new register is created, need to register it correctly in the map
 ** Language cleanup
-- shared expr type (annotated)
-- combine some languages to use the same (parameterized) type
+- parameterize each type with 'additional_exprs
+  - then they all use a 'additional_exprs expr
+- combine some languages to use the same (parameterized) type?
 ** error checking
 - typecheck (if I want nice errors need to annotate first few passes with line
   and original code)
   - `Safe_global_variables C_style_extracted_functions -> (`Typechecked (Type.t
     Register_map.t)) C_style_extracted_functions Or_error
   - every scoped register is unique so we just need one global map
-
-- in passes further down we need to propagate the type map
 ** lists
-** liveness analysis
 ** compression
 ** things that are weird
 - some types are hard to read (alias as modules?)
@@ -70,19 +50,12 @@ we don't really need a link register if we have program_counter. however, it
 shows up too late into the compilation so maybe sticking with link is the way to
 go. I think I could just implement "link" in the pc register anyway and it would
 all work out fine.
-** Think hard about optimizations
-- rearrange while you still have liveness information about registers (while
-  functions are still around). bring as many sets as you can before a function
-  call? or maybe after the call so they don't need to be saved?
-- condense once we get to Desmos_virutal_machine. assume we already have the
-  ordering down by this point and should just squish as many statements together
-  as possible? We also could allow for a little bit of reordering.
-** Think about if you want to make desmos output the vm language instead
-Then emulation would be even more similar to how things run in desmos. The
-current desmos_vm would be "<figure out name>" and would be the main language
-for optimizations. That way I could make it slightly more complex and not have
-to worry about emulating it. This is a problem for later though.
-** add a reset action
+
+I think jumplink and return should both use the pc stacks instead of the link register stack in the make_program_counter_explicit pass
+** Think about optimizations
+Compression should be done in Register_stack_instrs. Within each block, you can just fold over instructions and merge them greedily.
+
+Reordering...?
 * Overview of optimizations
 ** Simultaneous condition evaluation
 This is more of a language feature than an optimization, but whenever there are
@@ -97,7 +70,6 @@ Used for testing without actually needing to run things in Desmos. This avoids
 having to do a lot of annoying browser automation. The language is pretty close
 to the Desmos_output language but is more readable so I think it will be much
 easier to debug if it is the emulator target.
-* Overview of compiler (up to date as of 4/29)                      :ARCHIVE:
 * [4/4] Cleanup from this week                                      :ARCHIVE:
 * Overview of compiler (up to date as of 4/21)                      :ARCHIVE:
 * Overview of compiler (up to date as of 4/14)                      :ARCHIVE:
