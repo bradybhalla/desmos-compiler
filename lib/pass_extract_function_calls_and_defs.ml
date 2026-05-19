@@ -3,7 +3,7 @@ open Languages
 open Types
 open C_style_frontend
 
-let register_gen = Register_generator.create "extract_function_calls"
+let register_gen = Register_generator.create "extract"
 
 (* iterate over (compiled) branches and either add them in parallel to the current if statement
    or create a nested if statement depening on whether there are possible side effects

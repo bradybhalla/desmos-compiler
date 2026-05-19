@@ -2,12 +2,7 @@ open! Core
 open Desmos_compiler
 open Languages
 open Types
-
-let compile_frontend_to_vm prog =
-  prog |> Passes.check_function_defs |> ok_exn
-  |> Passes.extract_function_calls_and_defs |> Passes.check_variables_scopes
-  |> ok_exn |> Passes.rename_local_variables |> Passes.explicate_control
-  |> Passes.convert_functions_to_stack |> Passes.make_program_counter_explicit
+open Or_error.Let_syntax
 
 let desmos_cmd =
   Command.basic
@@ -18,11 +13,12 @@ let desmos_cmd =
      fun () ->
        let prog = file |> Sexp.load_sexps |> C_style_frontend.parse_ast in
        let js =
-         prog |> compile_frontend_to_vm |> Passes.generate_desmos_output
-         |> Passes.sanitize_register_names
-         |> Languages.Desmos_output.to_pastable_javascript
+         prog |> Cumulative_passes.sanitize_register_names
+         >>| Languages.Desmos_output.to_pastable_javascript
        in
-       print_endline js)
+       match js with
+       | Ok js -> print_endline js
+       | Error e -> print_s [%sexp (e : Error.t)])
 
 let emulator_cmd =
   Command.basic ~summary:"Compile a program and run it with the emulator."
@@ -34,83 +30,65 @@ let emulator_cmd =
      in
      fun () ->
        let prog = file |> Sexp.load_sexps |> C_style_frontend.parse_ast in
-       let vm_prog = prog |> compile_frontend_to_vm in
-       let emulator_state = Desmos_vm_emulator.run_until_done vm_prog in
        let result =
+         let%map vm_prog =
+           Cumulative_passes.make_program_counter_explicit prog
+         in
+         let emulator_state = Desmos_vm_emulator.run_until_done vm_prog in
          Desmos_vm_emulator.inspect_register emulator_state
            (Register.of_string output_reg)
        in
-       printf "%f\n" result)
+       match result with
+       | Ok result -> printf "%f\n" result
+       | Error e -> print_s [%sexp (e : Error.t)])
 
-let to_parse_ast = C_style_frontend.parse_ast
-
-let to_check_function_defs prog =
-  prog |> to_parse_ast |> Passes.check_function_defs
-
-let to_extract_function_calls prog =
-  prog |> to_check_function_defs |> ok_exn
-  |> Passes.extract_function_calls_and_defs
-
-let to_check_variable_scopes prog =
-  prog |> to_extract_function_calls |> Passes.check_variables_scopes
-
-let to_rename_local_variables prog =
-  prog |> to_check_variable_scopes |> ok_exn |> Passes.rename_local_variables
-
-let to_explicate_control prog =
-  prog |> to_rename_local_variables |> Passes.explicate_control
-
-let to_convert_to_stack prog =
-  prog |> to_explicate_control |> Passes.convert_functions_to_stack
-
-let to_make_pc_explicit prog =
-  prog |> to_convert_to_stack |> Passes.make_program_counter_explicit
-
-let to_generate_desmos prog =
-  prog |> to_make_pc_explicit |> Passes.generate_desmos_output
-
-let to_sanitize prog =
-  prog |> to_generate_desmos |> Passes.sanitize_register_names
+let parse = C_style_frontend.parse_ast
 
 let passes : (string * (Sexp.t list -> Sexp.t)) list =
   [
-    ( "frontend",
+    ( "parse",
+      fun prog -> prog |> parse |> [%sexp_of: [ `Unchecked ] C_style_frontend.t]
+    );
+    ( "check-func-defs",
       fun prog ->
-        prog |> to_parse_ast |> [%sexp_of: [ `Unchecked ] C_style_frontend.t] );
-    ( "check-function-defs",
-      fun prog ->
-        prog |> to_check_function_defs
+        prog |> parse |> Cumulative_passes.check_function_defs
         |> [%sexp_of: [ `Checked_function_defs ] C_style_frontend.t Or_error.t]
     );
-    ( "extract-function-calls",
+    ( "extract-funcs",
       fun prog ->
-        prog |> to_extract_function_calls
-        |> [%sexp_of: [ `Unchecked ] C_style_separated_functions.t] );
-    ( "check-variable-scopes",
+        prog |> parse |> Cumulative_passes.extract_function_calls_and_defs
+        |> [%sexp_of: [ `Unchecked ] C_style_separated_functions.t Or_error.t]
+    );
+    ( "check-scopes",
       fun prog ->
-        prog |> to_check_variable_scopes
+        prog |> parse |> Cumulative_passes.check_variables_scopes
         |> [%sexp_of:
              [ `Checked_variable_scopes ] C_style_separated_functions.t
              Or_error.t] );
-    ( "rename-local-variables",
+    ( "rename-locals",
       fun prog ->
-        prog |> to_rename_local_variables |> [%sexp_of: C_style_registers.t] );
+        prog |> parse |> Cumulative_passes.rename_local_variables
+        |> [%sexp_of: C_style_registers.t Or_error.t] );
     ( "explicate-control",
       fun prog ->
-        prog |> to_explicate_control |> [%sexp_of: Register_func_instrs.t] );
+        prog |> parse |> Cumulative_passes.explicate_control
+        |> [%sexp_of: Register_func_instrs.t Or_error.t] );
     ( "convert-to-stack",
       fun prog ->
-        prog |> to_convert_to_stack |> [%sexp_of: Register_stack_instrs.t] );
+        prog |> parse |> Cumulative_passes.convert_functions_to_stack
+        |> [%sexp_of: Register_stack_instrs.t Or_error.t] );
     ( "make-pc-explicit",
       fun prog ->
-        prog |> to_make_pc_explicit |> [%sexp_of: Desmos_virtual_machine.t] );
+        prog |> parse |> Cumulative_passes.make_program_counter_explicit
+        |> [%sexp_of: Desmos_virtual_machine.t Or_error.t] );
     ( "generate-desmos",
       fun prog ->
-        prog |> to_generate_desmos
-        |> [%sexp_of: [ `Unsanitized ] Desmos_output.t] );
-    ( "sanitize",
+        prog |> parse |> Cumulative_passes.generate_desmos_output
+        |> [%sexp_of: [ `Unsanitized ] Desmos_output.t Or_error.t] );
+    ( "sanitize-registers",
       fun prog ->
-        prog |> to_sanitize |> [%sexp_of: [ `Sanitized ] Desmos_output.t] );
+        prog |> parse |> Cumulative_passes.sanitize_register_names
+        |> [%sexp_of: [ `Sanitized ] Desmos_output.t Or_error.t] );
   ]
 
 let pass_arg = Command.Arg_type.of_alist_exn passes

@@ -3,7 +3,7 @@ open Desmos_compiler
 open Languages
 
 let compile prog =
-  prog |> Utils.read_from_str |> Cumulative_passes.explicate_control
+  prog |> Utils.read_from_str |> Cumulative_passes.explicate_control |> ok_exn
   |> [%sexp_of: Register_func_instrs.t] |> print_s
 
 let%expect_test "if" =
@@ -17,14 +17,14 @@ let%expect_test "if" =
     {|
     ((functions ())
      (main
-      (((label explicate_control_0_main) (body ())
+      (((label explicate_control_main_0) (body ())
         (control_flow
-         (Jump (conds (((Bool true) explicate_control_2_if_statement_branch)))
-          (default explicate_control_1_if_statement_exit))))
-       ((label explicate_control_2_if_statement_branch) (body ((Set x (Num 1))))
+         (Jump (conds (((Bool true) explicate_control_if_statement_branch_2)))
+          (default explicate_control_if_statement_exit_1))))
+       ((label explicate_control_if_statement_branch_2) (body ((Set x (Num 1))))
         (control_flow
-         (Jump (conds ()) (default explicate_control_1_if_statement_exit))))
-       ((label explicate_control_1_if_statement_exit) (body ((Set x (Num 1))))
+         (Jump (conds ()) (default explicate_control_if_statement_exit_1))))
+       ((label explicate_control_if_statement_exit_1) (body ((Set x (Num 1))))
         (control_flow Exit))))
      (global_registers (x)))
     |}]
@@ -43,20 +43,20 @@ let%expect_test "if / elif" =
     {|
     ((functions ())
      (main
-      (((label explicate_control_0_main) (body ())
+      (((label explicate_control_main_0) (body ())
         (control_flow
          (Jump
           (conds
-           (((Bool true) explicate_control_2_if_statement_branch)
-            ((Bool false) explicate_control_3_if_statement_branch)))
-          (default explicate_control_1_if_statement_exit))))
-       ((label explicate_control_2_if_statement_branch) (body ((Set x (Num 1))))
+           (((Bool true) explicate_control_if_statement_branch_2)
+            ((Bool false) explicate_control_if_statement_branch_3)))
+          (default explicate_control_if_statement_exit_1))))
+       ((label explicate_control_if_statement_branch_2) (body ((Set x (Num 1))))
         (control_flow
-         (Jump (conds ()) (default explicate_control_1_if_statement_exit))))
-       ((label explicate_control_3_if_statement_branch) (body ((Set x (Num 2))))
+         (Jump (conds ()) (default explicate_control_if_statement_exit_1))))
+       ((label explicate_control_if_statement_branch_3) (body ((Set x (Num 2))))
         (control_flow
-         (Jump (conds ()) (default explicate_control_1_if_statement_exit))))
-       ((label explicate_control_1_if_statement_exit) (body ((Set x (Num 1))))
+         (Jump (conds ()) (default explicate_control_if_statement_exit_1))))
+       ((label explicate_control_if_statement_exit_1) (body ((Set x (Num 1))))
         (control_flow Exit))))
      (global_registers (x)))
     |}]
@@ -75,17 +75,17 @@ let%expect_test "if / else" =
     {|
     ((functions ())
      (main
-      (((label explicate_control_0_main) (body ())
+      (((label explicate_control_main_0) (body ())
         (control_flow
-         (Jump (conds (((Bool true) explicate_control_2_if_statement_branch)))
-          (default explicate_control_3_if_statement_else))))
-       ((label explicate_control_2_if_statement_branch) (body ((Set x (Num 1))))
+         (Jump (conds (((Bool true) explicate_control_if_statement_branch_2)))
+          (default explicate_control_if_statement_else_3))))
+       ((label explicate_control_if_statement_branch_2) (body ((Set x (Num 1))))
         (control_flow
-         (Jump (conds ()) (default explicate_control_1_if_statement_exit))))
-       ((label explicate_control_3_if_statement_else) (body ((Set x (Num 2))))
+         (Jump (conds ()) (default explicate_control_if_statement_exit_1))))
+       ((label explicate_control_if_statement_else_3) (body ((Set x (Num 2))))
         (control_flow
-         (Jump (conds ()) (default explicate_control_1_if_statement_exit))))
-       ((label explicate_control_1_if_statement_exit) (body ((Set x (Num 1))))
+         (Jump (conds ()) (default explicate_control_if_statement_exit_1))))
+       ((label explicate_control_if_statement_exit_1) (body ((Set x (Num 1))))
         (control_flow Exit))))
      (global_registers (x)))
     |}]
@@ -105,23 +105,23 @@ let%expect_test "if / elif / else" =
     {|
     ((functions ())
      (main
-      (((label explicate_control_0_main) (body ())
+      (((label explicate_control_main_0) (body ())
         (control_flow
          (Jump
           (conds
-           (((Bool true) explicate_control_2_if_statement_branch)
-            ((Bool false) explicate_control_3_if_statement_branch)))
-          (default explicate_control_4_if_statement_else))))
-       ((label explicate_control_2_if_statement_branch) (body ((Set x (Num 1))))
+           (((Bool true) explicate_control_if_statement_branch_2)
+            ((Bool false) explicate_control_if_statement_branch_3)))
+          (default explicate_control_if_statement_else_4))))
+       ((label explicate_control_if_statement_branch_2) (body ((Set x (Num 1))))
         (control_flow
-         (Jump (conds ()) (default explicate_control_1_if_statement_exit))))
-       ((label explicate_control_3_if_statement_branch) (body ((Set x (Num 2))))
+         (Jump (conds ()) (default explicate_control_if_statement_exit_1))))
+       ((label explicate_control_if_statement_branch_3) (body ((Set x (Num 2))))
         (control_flow
-         (Jump (conds ()) (default explicate_control_1_if_statement_exit))))
-       ((label explicate_control_4_if_statement_else) (body ((Set x (Num 3))))
+         (Jump (conds ()) (default explicate_control_if_statement_exit_1))))
+       ((label explicate_control_if_statement_else_4) (body ((Set x (Num 3))))
         (control_flow
-         (Jump (conds ()) (default explicate_control_1_if_statement_exit))))
-       ((label explicate_control_1_if_statement_exit) (body ())
+         (Jump (conds ()) (default explicate_control_if_statement_exit_1))))
+       ((label explicate_control_if_statement_exit_1) (body ())
         (control_flow Exit))))
      (global_registers (x)))
     |}]
@@ -145,32 +145,31 @@ let%expect_test "function where all branches return (nested if)" =
     {|
     ((functions
       ((f
-        ((entry_label explicate_control_1_function_entry)
-         (params (1rename_local_vars_0))
+        ((entry_label explicate_control_function_entry_1) (params (1local_x_0))
          (blocks
-          (((label explicate_control_1_function_entry) (body ())
+          (((label explicate_control_function_entry_1) (body ())
             (control_flow
              (Jump
-              (conds (((Bool true) explicate_control_3_if_statement_branch)))
-              (default explicate_control_4_if_statement_else))))
-           ((label explicate_control_3_if_statement_branch) (body ())
+              (conds (((Bool true) explicate_control_if_statement_branch_3)))
+              (default explicate_control_if_statement_else_4))))
+           ((label explicate_control_if_statement_branch_3) (body ())
             (control_flow (Return (Num 1))))
-           ((label explicate_control_4_if_statement_else) (body ())
+           ((label explicate_control_if_statement_else_4) (body ())
             (control_flow
              (Jump
-              (conds (((Bool false) explicate_control_6_if_statement_branch)))
-              (default explicate_control_7_if_statement_else))))
-           ((label explicate_control_6_if_statement_branch) (body ())
+              (conds (((Bool false) explicate_control_if_statement_branch_6)))
+              (default explicate_control_if_statement_else_7))))
+           ((label explicate_control_if_statement_branch_6) (body ())
             (control_flow (Return (Num 2))))
-           ((label explicate_control_7_if_statement_else) (body ())
+           ((label explicate_control_if_statement_else_7) (body ())
             (control_flow (Return (Num 0))))
-           ((label explicate_control_5_if_statement_exit) (body ())
+           ((label explicate_control_if_statement_exit_5) (body ())
             (control_flow
-             (Jump (conds ()) (default explicate_control_2_if_statement_exit))))
-           ((label explicate_control_2_if_statement_exit) (body ())
+             (Jump (conds ()) (default explicate_control_if_statement_exit_2))))
+           ((label explicate_control_if_statement_exit_2) (body ())
             (control_flow Exit))))
-         (local_registers (1rename_local_vars_0))))))
-     (main (((label explicate_control_0_main) (body ()) (control_flow Exit))))
+         (local_registers (1local_x_0))))))
+     (main (((label explicate_control_main_0) (body ()) (control_flow Exit))))
      (global_registers ()))
     |}]
 
@@ -186,20 +185,20 @@ let%expect_test "while loop" =
     {|
     ((functions ())
      (main
-      (((label explicate_control_0_main) (body ())
+      (((label explicate_control_main_0) (body ())
         (control_flow
          (Jump
           (conds
-           (((Compare Lt (Register x) (Num 10)) explicate_control_2_while_entry)))
-          (default explicate_control_1_while_end))))
-       ((label explicate_control_2_while_entry)
+           (((Compare Lt (Register x) (Num 10)) explicate_control_while_entry_2)))
+          (default explicate_control_while_end_1))))
+       ((label explicate_control_while_entry_2)
         (body ((Set x (Add (Register x) (Num 1)))))
         (control_flow
          (Jump
           (conds
-           (((Compare Lt (Register x) (Num 10)) explicate_control_2_while_entry)))
-          (default explicate_control_1_while_end))))
-       ((label explicate_control_1_while_end) (body ((Set x (Num 1))))
+           (((Compare Lt (Register x) (Num 10)) explicate_control_while_entry_2)))
+          (default explicate_control_while_end_1))))
+       ((label explicate_control_while_end_1) (body ((Set x (Num 1))))
         (control_flow Exit))))
      (global_registers (x)))
     |}]

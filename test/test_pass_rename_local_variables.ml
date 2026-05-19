@@ -4,6 +4,7 @@ open Languages
 
 let compile str =
   str |> Utils.read_from_str |> Cumulative_passes.rename_local_variables
+  |> ok_exn
 
 let%expect_test "rename local variables" =
   compile
@@ -15,7 +16,7 @@ let%expect_test "rename local variables" =
 
     (def foo (a b) (
       (decl z)
-      (set z (+ a b))
+      (set z (a + b))
       (if (z > 0) (
         (decl p)
         (set p z)
@@ -24,7 +25,7 @@ let%expect_test "rename local variables" =
         (while (b > 0) (
           (decl q)
           (set q b)
-          (set b (- b 1))
+          (set b (b - 1))
         ))
         (return z)
       ))
@@ -38,7 +39,7 @@ let%expect_test "rename local variables" =
       (while (y > 0) (
         (decl s)
         (set s y)
-        (set y (- s 1))
+        (set y (s - 1))
       ))
     ))
     |}
@@ -47,45 +48,32 @@ let%expect_test "rename local variables" =
     {|
     ((functions
       ((foo
-        ((params (1rename_local_vars_3 1rename_local_vars_4))
+        ((params (1local_a_2 1local_b_3))
          (body
-          ((Call (func_name +)
-            (args
-             ((Register 1rename_local_vars_3) (Register 1rename_local_vars_4)))
-            (ret (1rename_local_vars_6)))
-           (Set 1rename_local_vars_5 (Register 1rename_local_vars_6))
+          ((Set 1local_z_4 (Add (Register 1local_a_2) (Register 1local_b_3)))
            (If
             (branches
-             (((Compare Gt (Register 1rename_local_vars_5) (Num 0))
-               ((Set 1rename_local_vars_9 (Register 1rename_local_vars_5))
-                (Return (Register 1rename_local_vars_9))))))
+             (((Compare Gt (Register 1local_z_4) (Num 0))
+               ((Set 1local_p_6 (Register 1local_z_4))
+                (Return (Register 1local_p_6))))))
             (else_
-             ((While (cond (Compare Gt (Register 1rename_local_vars_4) (Num 0)))
+             ((While (cond (Compare Gt (Register 1local_b_3) (Num 0)))
                (body
-                ((Set 1rename_local_vars_7 (Register 1rename_local_vars_4))
-                 (Call (func_name -)
-                  (args ((Register 1rename_local_vars_4) (Num 1)))
-                  (ret (1rename_local_vars_8)))
-                 (Set 1rename_local_vars_4 (Register 1rename_local_vars_8)))))
-              (Return (Register 1rename_local_vars_5)))))))
+                ((Set 1local_q_5 (Register 1local_b_3))
+                 (Set 1local_b_3 (Sub (Register 1local_b_3) (Num 1))))))
+              (Return (Register 1local_z_4)))))))
          (local_registers
-          (1rename_local_vars_3 1rename_local_vars_4 1rename_local_vars_5
-           1rename_local_vars_6 1rename_local_vars_7 1rename_local_vars_8
-           1rename_local_vars_9))))))
+          (1local_a_2 1local_b_3 1local_p_6 1local_q_5 1local_z_4))))))
      (main
       ((Set x (Num 0)) (Set y (Num 0))
        (If
         (branches
          (((Compare Gt (Register x) (Num 0))
-           ((Set 1rename_local_vars_2 (Register x))
-            (Set y (Register 1rename_local_vars_2))))))
+           ((Set 1local_r_1 (Register x)) (Set y (Register 1local_r_1))))))
         (else_
          ((While (cond (Compare Gt (Register y) (Num 0)))
            (body
-            ((Set 1rename_local_vars_0 (Register y))
-             (Call (func_name -) (args ((Register 1rename_local_vars_0) (Num 1)))
-              (ret (1rename_local_vars_1)))
-             (Set y (Register 1rename_local_vars_1))))))))))
-     (global_registers
-      (1rename_local_vars_0 1rename_local_vars_1 1rename_local_vars_2 x y)))
+            ((Set 1local_s_0 (Register y))
+             (Set y (Sub (Register 1local_s_0) (Num 1)))))))))))
+     (global_registers (1local_r_1 1local_s_0 x y)))
     |}]

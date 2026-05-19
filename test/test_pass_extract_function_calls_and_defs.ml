@@ -1,21 +1,18 @@
 open! Core
 open Desmos_compiler
 open Languages
-open Types
 
-let print_result stmts =
-  { stmts; info = `Unchecked }
-  |> Passes.check_function_defs |> ok_exn
-  |> Passes.extract_function_calls_and_defs
+let compile prog =
+  prog |> Utils.read_from_str
+  |> Cumulative_passes.extract_function_calls_and_defs |> ok_exn
   |> [%sexp_of: [ `Unchecked ] C_style_separated_functions.t] |> print_s
 
 let%expect_test "toplevel function defs extracted correctly" =
-  let open C_style_frontend in
-  let f = Function_name.of_string "f" in
-  let x = Register.of_string "x" in
-  let y = Register.of_string "y" in
-  [ Function_def (f, [ x ], [ Return (Register x) ]); Set (y, Num 5.) ]
-  |> print_result;
+  compile {|
+  (def f (x) (
+    (return x)
+  ))
+  (set y 5) |};
   [%expect
     {|
     ((functions ((f ((params (x)) (body ((Return (Register x))))))))
@@ -23,264 +20,172 @@ let%expect_test "toplevel function defs extracted correctly" =
     |}]
 
 let%expect_test "nested function calls extracted into separate statements" =
-  let open C_style_frontend in
-  let f = Function_name.of_string "f" in
-  let g = Function_name.of_string "g" in
-  let h = Function_name.of_string "h" in
-  let x = Register.of_string "x" in
-  [ Call (f, [ Call (g, [ Call (h, [ Register x ]) ]) ]) ] |> print_result;
+  compile {| (f (g (h x))) |};
   [%expect
     {|
     ((functions ())
      (main
-      ((Decl 1extract_function_calls_0_call)
-       (Call (func_name h) (args ((Register x)))
-        (ret (1extract_function_calls_0_call)))
-       (Decl 1extract_function_calls_1_call)
-       (Call (func_name g) (args ((Register 1extract_function_calls_0_call)))
-        (ret (1extract_function_calls_1_call)))
-       (Call (func_name f) (args ((Register 1extract_function_calls_1_call)))
-        (ret ()))))
+      ((Decl 1extract_call_0)
+       (Call (func_name h) (args ((Register x))) (ret (1extract_call_0)))
+       (Decl 1extract_call_1)
+       (Call (func_name g) (args ((Register 1extract_call_0)))
+        (ret (1extract_call_1)))
+       (Call (func_name f) (args ((Register 1extract_call_1))) (ret ()))))
      (info Unchecked))
     |}]
 
 let%expect_test "nested binary expressions extract function calls left to right"
     =
-  let open C_style_frontend in
-  let f = Function_name.of_string "f" in
-  let x = Register.of_string "x" in
-  let y = Register.of_string "y" in
-  let z = Register.of_string "z" in
-  let a = Register.of_string "a" in
-  let b = Register.of_string "b" in
-  let result = Register.of_string "result" in
-  (* f(x) + (f(y) + f(z) - f(a)) / f(b) *)
-  [
-    Set
-      ( result,
-        Add
-          ( Call (f, [ Register x ]),
-            Div
-              ( Sub
-                  ( Add (Call (f, [ Register y ]), Call (f, [ Register z ])),
-                    Call (f, [ Register a ]) ),
-                Call (f, [ Register b ]) ) ) );
-  ]
-  |> print_result;
+  compile {|
+  (set result (((f x) + (((f y) + (f z)) - (f a))) / (f b))) |};
   [%expect
     {|
     ((functions ())
      (main
-      ((Decl 1extract_function_calls_0_call)
-       (Call (func_name f) (args ((Register x)))
-        (ret (1extract_function_calls_0_call)))
-       (Decl 1extract_function_calls_1_call)
-       (Call (func_name f) (args ((Register y)))
-        (ret (1extract_function_calls_1_call)))
-       (Decl 1extract_function_calls_2_call)
-       (Call (func_name f) (args ((Register z)))
-        (ret (1extract_function_calls_2_call)))
-       (Decl 1extract_function_calls_3_call)
-       (Call (func_name f) (args ((Register a)))
-        (ret (1extract_function_calls_3_call)))
-       (Decl 1extract_function_calls_4_call)
-       (Call (func_name f) (args ((Register b)))
-        (ret (1extract_function_calls_4_call)))
+      ((Decl 1extract_call_0)
+       (Call (func_name f) (args ((Register x))) (ret (1extract_call_0)))
+       (Decl 1extract_call_1)
+       (Call (func_name f) (args ((Register y))) (ret (1extract_call_1)))
+       (Decl 1extract_call_2)
+       (Call (func_name f) (args ((Register z))) (ret (1extract_call_2)))
+       (Decl 1extract_call_3)
+       (Call (func_name f) (args ((Register a))) (ret (1extract_call_3)))
+       (Decl 1extract_call_4)
+       (Call (func_name f) (args ((Register b))) (ret (1extract_call_4)))
        (Set result
-        (Add (Register 1extract_function_calls_0_call)
-         (Div
-          (Sub
-           (Add (Register 1extract_function_calls_1_call)
-            (Register 1extract_function_calls_2_call))
-           (Register 1extract_function_calls_3_call))
-          (Register 1extract_function_calls_4_call))))))
+        (Div
+         (Add (Register 1extract_call_0)
+          (Sub (Add (Register 1extract_call_1) (Register 1extract_call_2))
+           (Register 1extract_call_3)))
+         (Register 1extract_call_4)))))
      (info Unchecked))
     |}]
 
 let%expect_test "function call extracted from while condition" =
-  let open C_style_frontend in
-  let f = Function_name.of_string "f" in
-  let x = Register.of_string "x" in
-  [ While (Call (f, [ Register x ]), []) ] |> print_result;
+  compile {| (while (f x) ()) |};
   [%expect
     {|
     ((functions ())
      (main
-      ((Decl 1extract_function_calls_0_call)
-       (Call (func_name f) (args ((Register x)))
-        (ret (1extract_function_calls_0_call)))
-       (While (cond (Register 1extract_function_calls_0_call))
+      ((Decl 1extract_call_0)
+       (Call (func_name f) (args ((Register x))) (ret (1extract_call_0)))
+       (While (cond (Register 1extract_call_0))
         (body
-         ((Call (func_name f) (args ((Register x)))
-           (ret (1extract_function_calls_0_call))))))))
+         ((Call (func_name f) (args ((Register x))) (ret (1extract_call_0))))))))
      (info Unchecked))
     |}]
 
 let%expect_test "function call extracted from first if condition" =
-  let open C_style_frontend in
-  let f = Function_name.of_string "f" in
-  let x = Register.of_string "x" in
-  let y = Register.of_string "y" in
-  [
-    If
-      {
-        branches = [ (Call (f, [ Register x ]), [ Set (y, Num 1.) ]) ];
-        else_ = [];
-      };
-  ]
-  |> print_result;
+  compile {|
+  (if (f x) (
+    (set y 1)
+  )) |};
   [%expect
     {|
     ((functions ())
      (main
-      ((Decl 1extract_function_calls_0_call)
-       (Call (func_name f) (args ((Register x)))
-        (ret (1extract_function_calls_0_call)))
-       (If
-        (branches
-         (((Register 1extract_function_calls_0_call) ((Set y (Num 1))))))
+      ((Decl 1extract_call_0)
+       (Call (func_name f) (args ((Register x))) (ret (1extract_call_0)))
+       (If (branches (((Register 1extract_call_0) ((Set y (Num 1))))))
         (else_ ()))))
      (info Unchecked))
     |}]
 
 let%expect_test "function call extracted from many if conditions" =
-  let open C_style_frontend in
-  let f = Function_name.of_string "f" in
-  let x = Register.of_string "x" in
-  let y = Register.of_string "y" in
-  [
-    If
-      {
-        branches =
-          [
-            (Call (f, [ Register x ]), [ Set (y, Num 1.) ]);
-            (Call (f, [ Register y ]), [ Set (y, Num 2.) ]);
-            (* don't extract from this one*)
-            (Register x, [ Set (y, Num 3.) ]);
-            (Call (f, [ Num 1. ]), [ Set (y, Num 4.) ]);
-          ];
-        else_ = [ Set (y, Num 5.) ];
-      };
-  ]
-  |> print_result;
+  compile
+    {|
+  (if (f x) (
+    (set y 1)
+  ) elif (f y) (
+    (set y 2)
+  ) elif x (
+    (set y 3)
+  ) elif (f 1) (
+    (set y 4)
+  ) else (
+    (set y 5)
+  )) |};
   [%expect
     {|
     ((functions ())
      (main
-      ((Decl 1extract_function_calls_0_call)
-       (Call (func_name f) (args ((Register x)))
-        (ret (1extract_function_calls_0_call)))
-       (If
-        (branches
-         (((Register 1extract_function_calls_0_call) ((Set y (Num 1))))))
+      ((Decl 1extract_call_0)
+       (Call (func_name f) (args ((Register x))) (ret (1extract_call_0)))
+       (If (branches (((Register 1extract_call_0) ((Set y (Num 1))))))
         (else_
-         ((Decl 1extract_function_calls_1_call)
-          (Call (func_name f) (args ((Register y)))
-           (ret (1extract_function_calls_1_call)))
+         ((Decl 1extract_call_1)
+          (Call (func_name f) (args ((Register y))) (ret (1extract_call_1)))
           (If
            (branches
-            (((Register 1extract_function_calls_1_call) ((Set y (Num 2))))
+            (((Register 1extract_call_1) ((Set y (Num 2))))
              ((Register x) ((Set y (Num 3))))))
            (else_
-            ((Decl 1extract_function_calls_2_call)
-             (Call (func_name f) (args ((Num 1)))
-              (ret (1extract_function_calls_2_call)))
-             (If
-              (branches
-               (((Register 1extract_function_calls_2_call) ((Set y (Num 4))))))
+            ((Decl 1extract_call_2)
+             (Call (func_name f) (args ((Num 1))) (ret (1extract_call_2)))
+             (If (branches (((Register 1extract_call_2) ((Set y (Num 4))))))
               (else_ ((Set y (Num 5)))))))))))))
      (info Unchecked))
     |}]
 
 let%expect_test "function call in And/Or respects short circuiting" =
-  let open C_style_frontend in
-  let f = Function_name.of_string "f" in
-  let x = Register.of_string "x" in
-  let y = Register.of_string "y" in
-  [
-    Set (y, And (Call (f, [ Num 1. ]), Call (f, [ Num 1. ])));
-    Set (y, Or (Call (f, [ Num 2. ]), Call (f, [ Num 2. ])));
-    Set
-      ( y,
-        And
-          (Call (f, [ Num 1. ]), Or (Call (f, [ Num 1. ]), Call (f, [ Num 3. ])))
-      );
-    Set (y, Or (Register x, And (Register y, Call (f, [ Num 4. ]))));
-  ]
-  |> print_result;
+  compile
+    {|
+  (set y ((f 1) && (f 1)))
+  (set y ((f 2) || (f 2)))
+  (set y ((f 1) && ((f 1) || (f 3))))
+  (set y (x || (y && (f 4)))) |};
   [%expect
     {|
     ((functions ())
      (main
-      ((Decl 1extract_function_calls_2_and) (Decl 1extract_function_calls_0_call)
-       (Call (func_name f) (args ((Num 1)))
-        (ret (1extract_function_calls_0_call)))
+      ((Decl 1extract_and_2) (Decl 1extract_call_0)
+       (Call (func_name f) (args ((Num 1))) (ret (1extract_call_0)))
        (If
         (branches
-         (((Register 1extract_function_calls_0_call)
-           ((Decl 1extract_function_calls_1_call)
-            (Call (func_name f) (args ((Num 1)))
-             (ret (1extract_function_calls_1_call)))
-            (Set 1extract_function_calls_2_and
-             (Register 1extract_function_calls_1_call))))))
-        (else_ ((Set 1extract_function_calls_2_and (Bool false)))))
-       (Set y (Register 1extract_function_calls_2_and))
-       (Decl 1extract_function_calls_5_or) (Decl 1extract_function_calls_3_call)
-       (Call (func_name f) (args ((Num 2)))
-        (ret (1extract_function_calls_3_call)))
+         (((Register 1extract_call_0)
+           ((Decl 1extract_call_1)
+            (Call (func_name f) (args ((Num 1))) (ret (1extract_call_1)))
+            (Set 1extract_and_2 (Register 1extract_call_1))))))
+        (else_ ((Set 1extract_and_2 (Bool false)))))
+       (Set y (Register 1extract_and_2)) (Decl 1extract_or_5)
+       (Decl 1extract_call_3)
+       (Call (func_name f) (args ((Num 2))) (ret (1extract_call_3)))
        (If
         (branches
-         (((Register 1extract_function_calls_3_call)
-           ((Set 1extract_function_calls_5_or (Bool true))))))
+         (((Register 1extract_call_3) ((Set 1extract_or_5 (Bool true))))))
         (else_
-         ((Decl 1extract_function_calls_4_call)
-          (Call (func_name f) (args ((Num 2)))
-           (ret (1extract_function_calls_4_call)))
-          (Set 1extract_function_calls_5_or
-           (Register 1extract_function_calls_4_call)))))
-       (Set y (Register 1extract_function_calls_5_or))
-       (Decl 1extract_function_calls_10_and)
-       (Decl 1extract_function_calls_6_call)
-       (Call (func_name f) (args ((Num 1)))
-        (ret (1extract_function_calls_6_call)))
+         ((Decl 1extract_call_4)
+          (Call (func_name f) (args ((Num 2))) (ret (1extract_call_4)))
+          (Set 1extract_or_5 (Register 1extract_call_4)))))
+       (Set y (Register 1extract_or_5)) (Decl 1extract_and_10)
+       (Decl 1extract_call_6)
+       (Call (func_name f) (args ((Num 1))) (ret (1extract_call_6)))
        (If
         (branches
-         (((Register 1extract_function_calls_6_call)
-           ((Decl 1extract_function_calls_9_or)
-            (Decl 1extract_function_calls_7_call)
-            (Call (func_name f) (args ((Num 1)))
-             (ret (1extract_function_calls_7_call)))
+         (((Register 1extract_call_6)
+           ((Decl 1extract_or_9) (Decl 1extract_call_7)
+            (Call (func_name f) (args ((Num 1))) (ret (1extract_call_7)))
             (If
              (branches
-              (((Register 1extract_function_calls_7_call)
-                ((Set 1extract_function_calls_9_or (Bool true))))))
+              (((Register 1extract_call_7) ((Set 1extract_or_9 (Bool true))))))
              (else_
-              ((Decl 1extract_function_calls_8_call)
-               (Call (func_name f) (args ((Num 3)))
-                (ret (1extract_function_calls_8_call)))
-               (Set 1extract_function_calls_9_or
-                (Register 1extract_function_calls_8_call)))))
-            (Set 1extract_function_calls_10_and
-             (Register 1extract_function_calls_9_or))))))
-        (else_ ((Set 1extract_function_calls_10_and (Bool false)))))
-       (Set y (Register 1extract_function_calls_10_and))
-       (Decl 1extract_function_calls_13_or)
-       (If
-        (branches
-         (((Register x) ((Set 1extract_function_calls_13_or (Bool true))))))
+              ((Decl 1extract_call_8)
+               (Call (func_name f) (args ((Num 3))) (ret (1extract_call_8)))
+               (Set 1extract_or_9 (Register 1extract_call_8)))))
+            (Set 1extract_and_10 (Register 1extract_or_9))))))
+        (else_ ((Set 1extract_and_10 (Bool false)))))
+       (Set y (Register 1extract_and_10)) (Decl 1extract_or_13)
+       (If (branches (((Register x) ((Set 1extract_or_13 (Bool true))))))
         (else_
-         ((Decl 1extract_function_calls_12_and)
+         ((Decl 1extract_and_12)
           (If
            (branches
             (((Register y)
-              ((Decl 1extract_function_calls_11_call)
-               (Call (func_name f) (args ((Num 4)))
-                (ret (1extract_function_calls_11_call)))
-               (Set 1extract_function_calls_12_and
-                (Register 1extract_function_calls_11_call))))))
-           (else_ ((Set 1extract_function_calls_12_and (Bool false)))))
-          (Set 1extract_function_calls_13_or
-           (Register 1extract_function_calls_12_and)))))
-       (Set y (Register 1extract_function_calls_13_or))))
+              ((Decl 1extract_call_11)
+               (Call (func_name f) (args ((Num 4))) (ret (1extract_call_11)))
+               (Set 1extract_and_12 (Register 1extract_call_11))))))
+           (else_ ((Set 1extract_and_12 (Bool false)))))
+          (Set 1extract_or_13 (Register 1extract_and_12)))))
+       (Set y (Register 1extract_or_13))))
      (info Unchecked))
     |}]

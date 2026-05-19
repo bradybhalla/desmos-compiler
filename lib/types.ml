@@ -38,7 +38,7 @@ module Unique_generator (M : String_id.S) = struct
     let str =
       match desc with
       | "" -> [%string "%{t.id}_%{t.cur#Int}"]
-      | desc -> [%string "%{t.id}_%{t.cur#Int}_%{desc}"]
+      | desc -> [%string "%{t.id}_%{desc}_%{t.cur#Int}"]
     in
     t.cur <- t.cur + 1;
     M.of_string str

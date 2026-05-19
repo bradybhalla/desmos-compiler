@@ -4,7 +4,7 @@ open Languages
 
 let compile str =
   str |> Utils.read_from_str |> Cumulative_passes.convert_functions_to_stack
-  |> Register_stack_instrs.sexp_of_t |> print_s
+  |> ok_exn |> Register_stack_instrs.sexp_of_t |> print_s
 
 let%expect_test "register saving and restoring at correct call sites" =
   (* we should see that a function call outside of a function doesn't use
@@ -21,23 +21,21 @@ let%expect_test "register saving and restoring at correct call sites" =
   [%expect
     {|
     ((blocks
-      (((label explicate_control_0_main)
+      (((label explicate_control_main_0)
         (body
          ((GeneralizedSet
-           ((00link Push) (1rename_local_vars_0 (Set (Register y)))
-            (1rename_local_vars_1 (Set (Register z)))))
-          (JumpLink explicate_control_1_function_entry)
+           ((00link Push) (1local_y_0 (Set (Register y)))
+            (1local_z_1 (Set (Register z)))))
+          (JumpLink explicate_control_function_entry_1)
           (GeneralizedSet ((00link Pop)))))
         (control_flow Exit))
-       ((label explicate_control_1_function_entry)
+       ((label explicate_control_function_entry_1)
         (body
          ((GeneralizedSet
-           ((00link Push)
-            (1rename_local_vars_0 (PushAndSet (Register 1rename_local_vars_1)))
-            (1rename_local_vars_1 (PushAndSet (Register 1rename_local_vars_0)))))
-          (JumpLink explicate_control_1_function_entry)
-          (GeneralizedSet
-           ((00link Pop) (1rename_local_vars_0 Pop) (1rename_local_vars_1 Pop)))))
-        (control_flow (Return (Register 1rename_local_vars_1))))))
-     (registers (00link 00ret 1rename_local_vars_0 1rename_local_vars_1 y z)))
+           ((00link Push) (1local_y_0 (PushAndSet (Register 1local_z_1)))
+            (1local_z_1 (PushAndSet (Register 1local_y_0)))))
+          (JumpLink explicate_control_function_entry_1)
+          (GeneralizedSet ((00link Pop) (1local_y_0 Pop) (1local_z_1 Pop)))))
+        (control_flow (Return (Register 1local_z_1))))))
+     (registers (00link 00ret 1local_y_0 1local_z_1 y z)))
     |}]

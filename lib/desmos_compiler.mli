@@ -1,7 +1,41 @@
 open! Core
 open Types
 module Types : module type of Types
-module Languages : module type of Languages
+(* module Languages : module type of Languages *)
+
+module Languages : sig
+  module C_style_frontend : sig
+    type 'a t [@@deriving sexp_of]
+
+    val parse_ast : Sexp.t list -> [ `Unchecked ] t
+  end
+
+  module C_style_separated_functions : sig
+    type 'a t [@@deriving sexp_of]
+  end
+
+  module C_style_registers : sig
+    type t [@@deriving sexp_of]
+  end
+
+  module Register_func_instrs : sig
+    type t [@@deriving sexp_of]
+  end
+
+  module Register_stack_instrs : sig
+    type t [@@deriving sexp_of]
+  end
+
+  module Desmos_virtual_machine : sig
+    type t [@@deriving sexp_of]
+  end
+
+  module Desmos_output : sig
+    type 'a t [@@deriving sexp_of]
+
+    val to_pastable_javascript : [ `Sanitized ] t -> string
+  end
+end
 
 module Passes : sig
   open Languages
@@ -76,29 +110,31 @@ module Cumulative_passes : sig
 
   val extract_function_calls_and_defs :
     [ `Unchecked ] C_style_frontend.t ->
-    [ `Unchecked ] C_style_separated_functions.t
+    [ `Unchecked ] C_style_separated_functions.t Or_error.t
 
   val check_variables_scopes :
     [ `Unchecked ] C_style_frontend.t ->
     [ `Checked_variable_scopes ] C_style_separated_functions.t Or_error.t
 
   val rename_local_variables :
-    [ `Unchecked ] C_style_frontend.t -> C_style_registers.t
+    [ `Unchecked ] C_style_frontend.t -> C_style_registers.t Or_error.t
 
   val explicate_control :
-    [ `Unchecked ] C_style_frontend.t -> Register_func_instrs.t
+    [ `Unchecked ] C_style_frontend.t -> Register_func_instrs.t Or_error.t
 
   val convert_functions_to_stack :
-    [ `Unchecked ] C_style_frontend.t -> Register_stack_instrs.t
+    [ `Unchecked ] C_style_frontend.t -> Register_stack_instrs.t Or_error.t
 
   val make_program_counter_explicit :
-    [ `Unchecked ] C_style_frontend.t -> Desmos_virtual_machine.t
+    [ `Unchecked ] C_style_frontend.t -> Desmos_virtual_machine.t Or_error.t
 
   val generate_desmos_output :
-    [ `Unchecked ] C_style_frontend.t -> [ `Unsanitized ] Desmos_output.t
+    [ `Unchecked ] C_style_frontend.t ->
+    [ `Unsanitized ] Desmos_output.t Or_error.t
 
   val sanitize_register_names :
-    [ `Unchecked ] C_style_frontend.t -> [ `Sanitized ] Desmos_output.t
+    [ `Unchecked ] C_style_frontend.t ->
+    [ `Sanitized ] Desmos_output.t Or_error.t
 end
 
 (** Emulator that runs the program once it has been compiled to
@@ -114,44 +150,3 @@ module Desmos_vm_emulator : sig
 end
 
 (* TODO: figure out how to expose languages more safely *)
-(* module Languages : sig *)
-(*   module C_style_frontend : sig *)
-(*     type 'a t [@@deriving sexp_of] *)
-(**)
-(*     val parse_ast : Sexp.t list -> [ `Unchecked ] t *)
-(*   end *)
-(**)
-(*   module C_style_separated_functions : sig *)
-(*     type 'a t [@@deriving sexp_of] *)
-(*   end *)
-(**)
-(*   module C_style_registers : sig *)
-(*     type t [@@deriving sexp_of] *)
-(*   end *)
-(**)
-(*   module Register_func_instrs : sig *)
-(*     type t [@@deriving sexp_of] *)
-(*   end *)
-(**)
-(*   module Register_func_instrs_with_call_liveness : sig *)
-(*     type t [@@deriving sexp_of] *)
-(*   end *)
-(**)
-(*   module Register_stack_instrs : sig *)
-(*     type t [@@deriving sexp_of] *)
-(*   end *)
-(**)
-(*   module Desmos_virtual_machine : sig *)
-(*     module Initial_registers : sig *)
-(*       type t [@@deriving sexp_of] *)
-(*     end *)
-(**)
-(*     type 'a t [@@deriving sexp_of] *)
-(*   end *)
-(**)
-(*   module Desmos_output : sig *)
-(*     type 'a t [@@deriving sexp_of] *)
-(**)
-(*     val to_pastable_javascript : [ `Sanitized ] t -> string *)
-(*   end *)
-(* end *)

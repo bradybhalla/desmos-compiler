@@ -38,11 +38,12 @@ let compile
     ({ functions; main; info = `Checked_variable_scopes } :
       [ `Checked_variable_scopes ] C_style_separated_functions.t) :
     C_style_registers.t =
-  let register_gen = Register_generator.create "rename_local_vars" in
+  let register_gen = Register_generator.create "local" in
   Register_generator.reset register_gen;
   let global_registers = Register.Hash_set.create () in
-  let create_register ~local_set () =
-    let reg = Register_generator.generate register_gen in
+  let create_register ~local_set ~old_reg () =
+    let old_name = Register.to_string old_reg in
+    let reg = Register_generator.generate ~desc:old_name register_gen in
     Hash_set.add local_set reg;
     reg
   in
@@ -59,7 +60,7 @@ let compile
       | C_style_separated_functions.Decl reg ->
           let new_reg =
             if is_global then register_global reg
-            else create_register ~local_set ()
+            else create_register ~local_set ~old_reg:reg ()
           in
           let cur_names = Map.add_exn cur_names ~key:reg ~data:new_reg in
           ([], cur_names)
@@ -123,7 +124,8 @@ let compile
           let param_names =
             List.fold params ~init:Register.Map.empty ~f:(fun map reg ->
                 Map.add_exn map ~key:reg
-                  ~data:(create_register ~local_set:func_registers ()))
+                  ~data:
+                    (create_register ~local_set:func_registers ~old_reg:reg ()))
           in
           let parent_names = merge_override global_names param_names in
           let params_renamed = List.map params ~f:(Map.find_exn param_names) in
