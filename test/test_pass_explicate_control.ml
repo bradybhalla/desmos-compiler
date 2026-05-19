@@ -1,24 +1,18 @@
 open! Core
 open Desmos_compiler
 open Languages
-open Types
+
+let compile prog =
+  prog |> Utils.read_from_str |> Cumulative_passes.explicate_control
+  |> [%sexp_of: Register_func_instrs.t] |> print_s
 
 let%expect_test "if" =
-  let prog : C_style_registers.t =
-    let open C_style_separated_functions in
-    let open C_style_registers in
-    let x = Register.of_string "x" in
-    {
-      functions = Function_name.Map.of_alist_exn [];
-      main =
-        [
-          If { branches = [ (Bool true, [ Set (x, Num 1.) ]) ]; else_ = [] };
-          Set (x, Num 1.);
-        ];
-      global_registers = Register.Set.empty;
-    }
-  in
-  prog |> Passes.explicate_control |> Register_func_instrs.sexp_of_t |> print_s;
+  compile {|
+  (decl x)
+  (if true (
+    (set x 1)
+  ))
+  (set x 1) |};
   [%expect
     {|
     ((functions ())
@@ -32,33 +26,19 @@ let%expect_test "if" =
          (Jump (conds ()) (default explicate_control_1_if_statement_exit))))
        ((label explicate_control_1_if_statement_exit) (body ((Set x (Num 1))))
         (control_flow Exit))))
-     (registers ()))
+     (global_registers (x)))
     |}]
 
 let%expect_test "if / elif" =
-  let prog : C_style_registers.t =
-    let open C_style_separated_functions in
-    let open C_style_registers in
-    let x = Register.of_string "x" in
-    {
-      functions = Function_name.Map.of_alist_exn [];
-      main =
-        [
-          If
-            {
-              branches =
-                [
-                  (Bool true, [ Set (x, Num 1.) ]);
-                  (Bool false, [ Set (x, Num 2.) ]);
-                ];
-              else_ = [];
-            };
-          Set (x, Num 1.);
-        ];
-      global_registers = Register.Set.empty;
-    }
-  in
-  prog |> Passes.explicate_control |> Register_func_instrs.sexp_of_t |> print_s;
+  compile
+    {|
+  (decl x)
+  (if true (
+    (set x 1)
+  ) elif false (
+    (set x 2)
+  ))
+  (set x 1) |};
   [%expect
     {|
     ((functions ())
@@ -78,29 +58,19 @@ let%expect_test "if / elif" =
          (Jump (conds ()) (default explicate_control_1_if_statement_exit))))
        ((label explicate_control_1_if_statement_exit) (body ((Set x (Num 1))))
         (control_flow Exit))))
-     (registers ()))
+     (global_registers (x)))
     |}]
 
 let%expect_test "if / else" =
-  let prog : C_style_registers.t =
-    let open C_style_separated_functions in
-    let open C_style_registers in
-    let x = Register.of_string "x" in
-    {
-      functions = Function_name.Map.of_alist_exn [];
-      main =
-        [
-          If
-            {
-              branches = [ (Bool true, [ Set (x, Num 1.) ]) ];
-              else_ = [ Set (x, Num 2.) ];
-            };
-          Set (x, Num 1.);
-        ];
-      global_registers = Register.Set.empty;
-    }
-  in
-  prog |> Passes.explicate_control |> Register_func_instrs.sexp_of_t |> print_s;
+  compile
+    {|
+  (decl x)
+  (if true (
+    (set x 1)
+  ) else (
+    (set x 2)
+  ))
+  (set x 1) |};
   [%expect
     {|
     ((functions ())
@@ -117,32 +87,20 @@ let%expect_test "if / else" =
          (Jump (conds ()) (default explicate_control_1_if_statement_exit))))
        ((label explicate_control_1_if_statement_exit) (body ((Set x (Num 1))))
         (control_flow Exit))))
-     (registers ()))
+     (global_registers (x)))
     |}]
 
 let%expect_test "if / elif / else" =
-  let prog : C_style_registers.t =
-    let open C_style_separated_functions in
-    let open C_style_registers in
-    let x = Register.of_string "x" in
-    {
-      functions = Function_name.Map.of_alist_exn [];
-      main =
-        [
-          If
-            {
-              branches =
-                [
-                  (Bool true, [ Set (x, Num 1.) ]);
-                  (Bool false, [ Set (x, Num 2.) ]);
-                ];
-              else_ = [ Set (x, Num 3.) ];
-            };
-        ];
-      global_registers = Register.Set.empty;
-    }
-  in
-  prog |> Passes.explicate_control |> Register_func_instrs.sexp_of_t |> print_s;
+  compile
+    {|
+  (decl x)
+  (if true (
+    (set x 1)
+  ) elif false (
+    (set x 2)
+  ) else (
+    (set x 3)
+  )) |};
   [%expect
     {|
     ((functions ())
@@ -165,51 +123,30 @@ let%expect_test "if / elif / else" =
          (Jump (conds ()) (default explicate_control_1_if_statement_exit))))
        ((label explicate_control_1_if_statement_exit) (body ())
         (control_flow Exit))))
-     (registers ()))
+     (global_registers (x)))
     |}]
 
 let%expect_test "function where all branches return (nested if)" =
   (* the current behavior is that this creates some empty unreachable blocks *)
-  let prog : C_style_registers.t =
-    let open C_style_separated_functions in
-    let open C_style_registers in
-    let x = Register.of_string "x" in
-    let f = Function_name.of_string "f" in
-    {
-      functions =
-        Function_name.Map.of_alist_exn
-          [
-            ( f,
-              {
-                params = [ x ];
-                body =
-                  [
-                    If
-                      {
-                        branches = [ (Bool true, [ Return (Num 1.) ]) ];
-                        else_ =
-                          [
-                            If
-                              {
-                                branches = [ (Bool false, [ Return (Num 2.) ]) ];
-                                else_ = [ Return (Num 0.) ];
-                              };
-                          ];
-                      };
-                  ];
-                local_registers = Register.Set.empty;
-              } );
-          ];
-      main = [];
-      global_registers = Register.Set.empty;
-    }
-  in
-  prog |> Passes.explicate_control |> Register_func_instrs.sexp_of_t |> print_s;
+  compile
+    {|
+  (def f (x) (
+    (if true (
+      (return 1)
+    ) else (
+      (if false (
+        (return 2)
+      ) else (
+        (return 0)
+      ))
+    ))
+  )) |};
   [%expect
     {|
     ((functions
       ((f
-        ((entry_label explicate_control_1_function_entry) (params (x))
+        ((entry_label explicate_control_1_function_entry)
+         (params (1rename_local_vars_0))
          (blocks
           (((label explicate_control_1_function_entry) (body ())
             (control_flow
@@ -231,31 +168,20 @@ let%expect_test "function where all branches return (nested if)" =
             (control_flow
              (Jump (conds ()) (default explicate_control_2_if_statement_exit))))
            ((label explicate_control_2_if_statement_exit) (body ())
-            (control_flow Exit))))))))
+            (control_flow Exit))))
+         (local_registers (1rename_local_vars_0))))))
      (main (((label explicate_control_0_main) (body ()) (control_flow Exit))))
-     (registers ()))
+     (global_registers ()))
     |}]
 
 let%expect_test "while loop" =
-  let prog : C_style_registers.t =
-    let open C_style_separated_functions in
-    let open C_style_registers in
-    let x = Register.of_string "x" in
-    {
-      functions = Function_name.Map.of_alist_exn [];
-      main =
-        [
-          While
-            {
-              cond = Compare (Lt, Register x, Num 10.);
-              body = [ Set (x, Add (Register x, Num 1.)) ];
-            };
-          Set (x, Num 1.);
-        ];
-      global_registers = Register.Set.empty;
-    }
-  in
-  prog |> Passes.explicate_control |> Register_func_instrs.sexp_of_t |> print_s;
+  compile
+    {|
+  (decl x)
+  (while (x < 10) (
+    (set x (x + 1))
+  ))
+  (set x 1) |};
   [%expect
     {|
     ((functions ())
@@ -275,5 +201,5 @@ let%expect_test "while loop" =
           (default explicate_control_1_while_end))))
        ((label explicate_control_1_while_end) (body ((Set x (Num 1))))
         (control_flow Exit))))
-     (registers ()))
+     (global_registers (x)))
     |}]

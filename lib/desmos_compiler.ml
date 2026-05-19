@@ -22,3 +22,32 @@ module Passes = struct
   let generate_desmos_output = Pass_generate_desmos_output.compile
   let sanitize_register_names = Pass_sanitize_register_names.compile
 end
+
+module Cumulative_passes = struct
+  let check_function_defs prog = prog |> Passes.check_function_defs
+
+  let extract_function_calls_and_defs prog =
+    prog |> check_function_defs |> ok_exn
+    |> Passes.extract_function_calls_and_defs
+
+  let check_variables_scopes prog =
+    prog |> extract_function_calls_and_defs |> Passes.check_variables_scopes
+
+  let rename_local_variables prog =
+    prog |> check_variables_scopes |> ok_exn |> Passes.rename_local_variables
+
+  let explicate_control prog =
+    prog |> rename_local_variables |> Passes.explicate_control
+
+  let convert_functions_to_stack prog =
+    prog |> explicate_control |> Passes.convert_functions_to_stack
+
+  let make_program_counter_explicit prog =
+    prog |> convert_functions_to_stack |> Passes.make_program_counter_explicit
+
+  let generate_desmos_output prog =
+    prog |> make_program_counter_explicit |> Passes.generate_desmos_output
+
+  let sanitize_register_names prog =
+    prog |> generate_desmos_output |> Passes.sanitize_register_names
+end

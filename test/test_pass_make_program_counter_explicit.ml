@@ -1,38 +1,21 @@
 open! Core
 open Desmos_compiler
 open Languages
-open Types
 
-let compile prog =
-  prog |> Passes.make_program_counter_explicit
+let compile str =
+  str |> Utils.read_from_str |> Cumulative_passes.make_program_counter_explicit
   |> Desmos_virtual_machine.sexp_of_t |> print_s
 
 let%expect_test "normal instructions compile correctly" =
-  let prog : Register_stack_instrs.t =
-    let open Register_stack_instrs in
-    let a = Register.of_string "a" in
-    {
-      blocks =
-        [
-          {
-            label = Label.of_string "normal_instrs";
-            body =
-              [
-                GeneralizedSet [ (a, Set (Num 5.)) ];
-                GeneralizedSet
-                  [ (Register.of_string "b", Set (Add (Register a, Num 1.))) ];
-              ];
-            control_flow = Exit;
-          };
-        ];
-      registers = Register.Set.empty;
-    }
-  in
-  compile prog;
+  compile {|
+  (decl a)
+  (decl b)
+  (set a 5)
+  (set b (a + 1)) |};
   [%expect
     {|
     ((main
-      (((label normal_instrs)
+      (((label explicate_control_0_main)
         (body
          ((Instruction
            ((00pc (Set (Add (Register 00pc) (Num 1)))) (a (Set (Num 5)))))
@@ -40,108 +23,85 @@ let%expect_test "normal instructions compile correctly" =
            ((00pc (Set (Add (Register 00pc) (Num 1))))
             (b (Set (Add (Register a) (Num 1))))))
           Exit)))))
-     (info ()))
+     (registers
+      ((00link (Num 1.2345)) (00pc (Num 0)) (00ret (Num 1.2345)) (a (Num 1.2345))
+       (b (Num 1.2345)))))
     |}]
 
 let%expect_test "jump compiles correctly" =
-  let prog : Register_stack_instrs.t =
-    let open Register_stack_instrs in
-    {
-      blocks =
-        [
-          {
-            label = Label.of_string "conditional_jump";
-            body = [];
-            control_flow =
-              Jump
-                {
-                  conds =
-                    [
-                      ( Compare
-                          ( Compare_op.Eq,
-                            Register (Register.of_string "c"),
-                            Num 0. ),
-                        Label.of_string "target" );
-                    ];
-                  default = Label.of_string "default";
-                };
-          };
-        ];
-      registers = Register.Set.empty;
-    }
-  in
-  compile prog;
+  compile {|
+  (decl c)
+  (if (c == 0) ()) |};
   [%expect
     {|
     ((main
-      (((label conditional_jump)
+      (((label explicate_control_0_main)
         (body
          ((Instruction
            ((00pc
              (Set
               (If_expr
                (conds
-                (((Compare Eq (Register c) (Num 0)) (LabelLineNumber target))))
-               (default (LabelLineNumber default))))))))))))
-     (info ()))
+                (((Compare Eq (Register c) (Num 0))
+                  (LabelLineNumber explicate_control_2_if_statement_branch))))
+               (default (LabelLineNumber explicate_control_1_if_statement_exit))))))))))
+       ((label explicate_control_2_if_statement_branch)
+        (body
+         ((Instruction
+           ((00pc
+             (Set
+              (If_expr (conds ())
+               (default (LabelLineNumber explicate_control_1_if_statement_exit))))))))))
+       ((label explicate_control_1_if_statement_exit) (body (Exit)))))
+     (registers
+      ((00link (Num 1.2345)) (00pc (Num 0)) (00ret (Num 1.2345))
+       (c (Num 1.2345)))))
     |}]
 
 let%expect_test "JumpLink compiles correctly" =
-  let prog : Register_stack_instrs.t =
-    let open Register_stack_instrs in
-    {
-      blocks =
-        [
-          {
-            label = Label.of_string "jumplink_test";
-            body =
-              [
-                GeneralizedSet [ (Register.of_string "a", Set (Num 1.)) ];
-                JumpLink (Label.of_string "func");
-              ];
-            control_flow = Exit;
-          };
-        ];
-      registers = Register.Set.empty;
-    }
-  in
-  compile prog;
+  compile {|
+  (def func () ((return 0)))
+  (decl a)
+  (set a 1)
+  (func) |};
   [%expect
     {|
     ((main
-      (((label jumplink_test)
+      (((label explicate_control_0_main)
         (body
          ((Instruction
            ((00pc (Set (Add (Register 00pc) (Num 1)))) (a (Set (Num 1)))))
           (Instruction
+           ((00pc (Set (Add (Register 00pc) (Num 1)))) (00link Push)))
+          (Instruction
            ((00link (Set (Add (Register 00pc) (Num 1))))
-            (00pc (Set (LabelLineNumber func)))))
-          Exit)))))
-     (info ()))
+            (00pc (Set (LabelLineNumber explicate_control_1_function_entry)))))
+          (Instruction ((00pc (Set (Add (Register 00pc) (Num 1)))) (00link Pop)))
+          Exit)))
+       ((label explicate_control_1_function_entry)
+        (body
+         ((Instruction ((00ret (Set (Num 0))) (00pc (Set (Register 00link))))))))))
+     (registers
+      ((00link (Num 1.2345)) (00pc (Num 0)) (00ret (Num 1.2345))
+       (a (Num 1.2345)))))
     |}]
 
 let%expect_test "return compiles correctly" =
-  let prog : Register_stack_instrs.t =
-    let open Register_stack_instrs in
-    {
-      blocks =
-        [
-          {
-            label = Label.of_string "return_test";
-            body = [];
-            control_flow = Return (Register (Register.of_string "b"));
-          };
-        ];
-      registers = Register.Set.empty;
-    }
-  in
-  compile prog;
+  compile {|
+  (def return_test () (
+    (decl b)
+    (return b)
+  )) |};
   [%expect
     {|
     ((main
-      (((label return_test)
+      (((label explicate_control_0_main) (body (Exit)))
+       ((label explicate_control_1_function_entry)
         (body
          ((Instruction
-           ((00ret (Set (Register b))) (00pc (Set (Register 00link))))))))))
-     (info ()))
+           ((00ret (Set (Register 1rename_local_vars_0)))
+            (00pc (Set (Register 00link))))))))))
+     (registers
+      ((00link (Num 1.2345)) (00pc (Num 0)) (00ret (Num 1.2345))
+       (1rename_local_vars_0 (Num 1.2345)))))
     |}]

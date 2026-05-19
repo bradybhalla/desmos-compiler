@@ -122,6 +122,10 @@ let compile { Register_func_instrs.functions; main; global_registers } =
   in
   let combined_registers =
     Map.fold functions ~init:global_registers ~f:(fun ~key:_ ~data:def acc ->
+        if not (Set.is_empty (Set.inter acc def.local_registers)) then
+          failwith
+            "expected register sets to be disjoint. there is probably an issue \
+             with register renaming.";
         Set.union acc def.local_registers)
     |> Set.union (Rset.of_list [ link_register; return_register ])
   in

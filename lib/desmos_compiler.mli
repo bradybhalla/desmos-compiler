@@ -64,14 +64,52 @@ module Passes : sig
   (** Rename registers so they have valid Desmos names *)
 end
 
-module Desmos_vm_emulator : sig
+(** Similar to the `Passes` module but each function starts with the frontend
+    language. This helps remove a lot of repetitive code in the executable and
+    tests. *)
+module Cumulative_passes : sig
   open Languages
 
+  val check_function_defs :
+    [ `Unchecked ] C_style_frontend.t ->
+    [ `Checked_function_defs ] C_style_frontend.t Or_error.t
+
+  val extract_function_calls_and_defs :
+    [ `Unchecked ] C_style_frontend.t ->
+    [ `Unchecked ] C_style_separated_functions.t
+
+  val check_variables_scopes :
+    [ `Unchecked ] C_style_frontend.t ->
+    [ `Checked_variable_scopes ] C_style_separated_functions.t Or_error.t
+
+  val rename_local_variables :
+    [ `Unchecked ] C_style_frontend.t -> C_style_registers.t
+
+  val explicate_control :
+    [ `Unchecked ] C_style_frontend.t -> Register_func_instrs.t
+
+  val convert_functions_to_stack :
+    [ `Unchecked ] C_style_frontend.t -> Register_stack_instrs.t
+
+  val make_program_counter_explicit :
+    [ `Unchecked ] C_style_frontend.t -> Desmos_virtual_machine.t
+
+  val generate_desmos_output :
+    [ `Unchecked ] C_style_frontend.t -> [ `Unsanitized ] Desmos_output.t
+
+  val sanitize_register_names :
+    [ `Unchecked ] C_style_frontend.t -> [ `Sanitized ] Desmos_output.t
+end
+
+(** Emulator that runs the program once it has been compiled to
+    `Desmos_virtual_machine.t`. This is used to make sure programs run correctly
+    without needing to actually put it in Desmos. *)
+module Desmos_vm_emulator : sig
   type t
 
-  val create : Desmos_virtual_machine.t -> t
+  val create : Languages.Desmos_virtual_machine.t -> t
   val step : t -> [ `Done | `Not_done ]
-  val run_until_done : Desmos_virtual_machine.t -> t
+  val run_until_done : Languages.Desmos_virtual_machine.t -> t
   val inspect_register : t -> Register.t -> float
 end
 

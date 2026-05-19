@@ -3,9 +3,7 @@ open Desmos_compiler
 open Languages
 
 let compile str =
-  str |> Utils.read_from_str |> Passes.check_function_defs |> ok_exn
-  |> Passes.extract_function_calls_and_defs |> Passes.check_variables_scopes
-  |> ok_exn |> Passes.rename_local_variables
+  str |> Utils.read_from_str |> Cumulative_passes.rename_local_variables
 
 let%expect_test "rename local variables" =
   compile
@@ -69,7 +67,11 @@ let%expect_test "rename local variables" =
                   (args ((Register 1rename_local_vars_4) (Num 1)))
                   (ret (1rename_local_vars_8)))
                  (Set 1rename_local_vars_4 (Register 1rename_local_vars_8)))))
-              (Return (Register 1rename_local_vars_5)))))))))))
+              (Return (Register 1rename_local_vars_5)))))))
+         (local_registers
+          (1rename_local_vars_3 1rename_local_vars_4 1rename_local_vars_5
+           1rename_local_vars_6 1rename_local_vars_7 1rename_local_vars_8
+           1rename_local_vars_9))))))
      (main
       ((Set x (Num 0)) (Set y (Num 0))
        (If
@@ -84,6 +86,6 @@ let%expect_test "rename local variables" =
              (Call (func_name -) (args ((Register 1rename_local_vars_0) (Num 1)))
               (ret (1rename_local_vars_1)))
              (Set y (Register 1rename_local_vars_1))))))))))
-     (registers
+     (global_registers
       (1rename_local_vars_0 1rename_local_vars_1 1rename_local_vars_2 x y)))
     |}]
