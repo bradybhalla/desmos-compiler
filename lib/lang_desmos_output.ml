@@ -127,13 +127,22 @@ let latex_of_action { conds; default } =
 
 let to_pastable_javascript
     ({ program_action; init_registers; info = `Sanitized } : [ `Sanitized ] t) =
-  let action_latex = latex_of_action program_action in
-  let register_latex =
+  let program_desmos_line = "M_{ain} = " ^ latex_of_action program_action in
+  let reset_desmos_line =
+    "R_{eset} = "
+    ^ latex_of_action
+        {
+          conds = [];
+          default = List.map init_registers ~f:(fun (reg, expr) -> (reg, expr));
+        }
+  in
+  let register_desmos_lines =
     List.map init_registers ~f:(fun (reg, expr) ->
         latex_of_register reg ^ "=" ^ latex_of_expr expr)
   in
   let json_equations =
-    List.map (action_latex :: register_latex) ~f:(fun str ->
+    List.map (program_desmos_line :: reset_desmos_line :: register_desmos_lines)
+      ~f:(fun str ->
         let escaped =
           String.substr_replace_all ~pattern:"\\" ~with_:"\\\\" str
         in
