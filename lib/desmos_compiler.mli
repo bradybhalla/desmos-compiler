@@ -4,32 +4,66 @@ module Types : module type of Types
 
 (* TODO brady: this is currently a nice way to expose the languages, but we can no longer directly define intermediate languages in tests. *)
 module Languages : sig
+  (** The current starting language. It is imperative and has features like
+      variables, functions, while loops, if statements, and basic math
+      expressions. *)
   module C_style_frontend : sig
     type 'a t [@@deriving sexp_of]
 
     val parse_ast : Sexp.t list -> [ `Unchecked ] t
   end
 
+  (** An imperative language almost identical to the previous one but with
+      functions stored separately from the main program. It also doesn't allow
+      function calls to be inside of expressions. *)
   module C_style_separated_functions : sig
     type 'a t [@@deriving sexp_of]
   end
 
+  (** An imperative language similar to the previous one but where all registers
+      share a global scope. *)
   module C_style_registers : sig
     type t [@@deriving sexp_of]
   end
 
+  (** A register-based instruction set that has support for functions. The
+      different things you can do are:
+      - Set a register to an expression
+      - Call a function and possibly put the output in the given register
+      - Jump to the label of the first true condition, otherwise to the default
+        label
+      - Return an expression from a function This language makes a distinction
+        between normal statements (Set/Call) and control flow operations
+        (Jump/Return). Control flow is only allowed (and required) at the end of
+        a block. *)
   module Register_func_instrs : sig
     type t [@@deriving sexp_of]
   end
 
+  (** A register-based instruction set like the previous language, but doesn't
+      have direct support for functions anymore. Each register has a stack that
+      its value can be pushed/popped from. The things you can do are
+      - GeneralizedSet a list of (register,expression) pairs. All expressions
+        are computed before any register is set, and there is an option to
+        push/pop register values.
+      - JumpLink will set the link register to the next line and jump to the
+        label. This is the only control flow that can go in the middle of a
+        block, which is allowed because the program will eventually return here.
+      - Return will set the program counter to the link register value. *)
   module Register_stack_instrs : sig
     type t [@@deriving sexp_of]
   end
 
+  (** The target language of the compiler which can be almost directly
+      translated to Desmos after resolving labels. The instructions just
+      set/pop/push registers and exit the program when it is complete. *)
   module Desmos_virtual_machine : sig
     type t [@@deriving sexp_of]
   end
 
+  (** Desmos expressions that will simulate the program when the main action is
+      repeatedly run. This language prints out JavaScript code that will insert
+      all necessary expressions in Desmos when pasted into the console. *)
   module Desmos_output : sig
     type 'a t [@@deriving sexp_of]
 

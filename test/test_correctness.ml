@@ -8,24 +8,24 @@ let compile_and_run ~file ~reg =
 
 let%expect_test "basic features" =
   compile_and_run ~file:"programs/basic_language_features.sexp" ~reg:"a";
-  [%expect {| 6.000000 |}]
+  [%expect {| (Ok 6) |}]
 
 let%expect_test "fib 12 with a while loop" =
   compile_and_run ~file:"programs/fib_12.sexp" ~reg:"result";
-  [%expect {| 144.000000 |}]
+  [%expect {| (Ok 144) |}]
 
 let%expect_test "fib 8 with a slow recursive function" =
   compile_and_run ~file:"programs/fib_8_slow.sexp" ~reg:"n";
-  [%expect {| 21.000000 |}]
+  [%expect {| (Ok 21) |}]
 
 let%expect_test "highest number in collatz(27)" =
   compile_and_run ~file:"programs/collatz.sexp" ~reg:"highest";
-  [%expect {| 9232.000000 |}]
+  [%expect {| (Ok 9232) |}]
 
 let%expect_test "short circuiting" =
   compile_and_run ~file:"programs/short_circuiting.sexp" ~reg:"count";
-  [%expect {| 17.000000 |}]
+  [%expect {| (Ok 17) |}]
 
 let%expect_test "variable scopes" =
   compile_and_run ~file:"programs/variable_scopes.sexp" ~reg:"y";
-  [%expect {| 8.000000 |}]
+  [%expect {| (Ok 8) |}]

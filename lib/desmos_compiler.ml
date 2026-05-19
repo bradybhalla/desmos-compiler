@@ -3,11 +3,6 @@ module Types = Types
 module Languages = Languages
 module Desmos_vm_emulator = Desmos_vm_emulator
 
-module For_testing = struct
-  module Languages = Languages
-  module Types = Types
-end
-
 module Passes = struct
   let check_function_defs = Pass_check_function_defs.compile
 

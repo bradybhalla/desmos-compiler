@@ -32,7 +32,7 @@ let%expect_test "0 instructions" =
     |}];
   print_js prog;
   [%expect
-    {| Calc.setExpressions([{latex: "\\left\\{R_{00pc} = 0: R_{00pc}\\to -1, R_{00pc}\\to R_{00pc}\\right\\}"}, {latex: "R_{00link}=1.2345"}, {latex: "R_{200linkStack}=\\left[5.4321\\right]"}, {latex: "R_{00pc}=0"}, {latex: "R_{200pcStack}=\\left[5.4321\\right]"}, {latex: "R_{00ret}=1.2345"}, {latex: "R_{200retStack}=\\left[5.4321\\right]"}]) |}]
+    {| Calc.setExpressions([{latex: "M_{ain} = \\left\\{R_{00pc} = 0: R_{00pc}\\to -1, R_{00pc}\\to R_{00pc}\\right\\}"}, {latex: "R_{eset} = \\left(R_{00link}\\to 1.2345, R_{200linkStack}\\to \\left[5.4321\\right], R_{00pc}\\to 0, R_{200pcStack}\\to \\left[5.4321\\right], R_{00ret}\\to 1.2345, R_{200retStack}\\to \\left[5.4321\\right]\\right)"}, {latex: "R_{00link}=1.2345"}, {latex: "R_{200linkStack}=\\left[5.4321\\right]"}, {latex: "R_{00pc}=0"}, {latex: "R_{200pcStack}=\\left[5.4321\\right]"}, {latex: "R_{00ret}=1.2345"}, {latex: "R_{200retStack}=\\left[5.4321\\right]"}]) |}]
 
 (* let%expect_test "multiple instructions" = *)
 (*   let prog = *)
