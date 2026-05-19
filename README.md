@@ -7,18 +7,17 @@
 
 ## Usage
 
-Install with `opam install .`
 
 The program can be run from the command line as follows:
 ```sh
 # print js output
-desmos-compiler desmos <file>
+dune exec desmos-compiler -- desmos <file>
 
 # run with emulator
-desmos-compiler emulator <file> -reg <output register>
+dune exec desmos-compiler -- emulator <file> -reg <output register>
 
 # print sexp of intermediate language
-desmos-compiler debug <file> -pass <final pass>
+dune exec desmos-compiler -- debug <file>
 ```
 
-You can also pass `-help` to any command for more information.
+You can also pass `-help` to any command for more information / additional arguments.

@@ -18,7 +18,7 @@ let desmos_cmd =
        in
        match js with
        | Ok js -> print_endline js
-       | Error e -> print_s [%sexp (e : Error.t)])
+       | Error _ -> print_s [%sexp (js : _ Or_error.t)])
 
 let emulator_cmd =
   Command.basic ~summary:"Compile a program and run it with the emulator."
@@ -40,56 +40,64 @@ let emulator_cmd =
        in
        match result with
        | Ok result -> printf "%f\n" result
-       | Error e -> print_s [%sexp (e : Error.t)])
+       | Error _ -> print_s [%sexp (result : _ Or_error.t)])
 
 let parse = C_style_frontend.parse_ast
 
-let passes : (string * (Sexp.t list -> Sexp.t)) list =
+let passes =
   [
     ( "parse",
-      fun prog -> prog |> parse |> [%sexp_of: [ `Unchecked ] C_style_frontend.t]
-    );
-    ( "check-func-defs",
+      fun prog ->
+        prog |> parse |> [%sexp_of: [ `Unchecked ] C_style_frontend.t]
+        |> print_s );
+    ( "check-function-defs",
       fun prog ->
         prog |> parse |> Cumulative_passes.check_function_defs
         |> [%sexp_of: [ `Checked_function_defs ] C_style_frontend.t Or_error.t]
-    );
-    ( "extract-funcs",
+        |> print_s );
+    ( "extract-function-calls-and-defs",
       fun prog ->
         prog |> parse |> Cumulative_passes.extract_function_calls_and_defs
         |> [%sexp_of: [ `Unchecked ] C_style_separated_functions.t Or_error.t]
-    );
-    ( "check-scopes",
+        |> print_s );
+    ( "check-variables-scopes",
       fun prog ->
         prog |> parse |> Cumulative_passes.check_variables_scopes
         |> [%sexp_of:
              [ `Checked_variable_scopes ] C_style_separated_functions.t
-             Or_error.t] );
-    ( "rename-locals",
+             Or_error.t] |> print_s );
+    ( "rename-local-variables",
       fun prog ->
         prog |> parse |> Cumulative_passes.rename_local_variables
-        |> [%sexp_of: C_style_registers.t Or_error.t] );
+        |> [%sexp_of: C_style_registers.t Or_error.t] |> print_s );
     ( "explicate-control",
       fun prog ->
         prog |> parse |> Cumulative_passes.explicate_control
-        |> [%sexp_of: Register_func_instrs.t Or_error.t] );
-    ( "convert-to-stack",
+        |> [%sexp_of: Register_func_instrs.t Or_error.t] |> print_s );
+    ( "convert-functions-to-stack",
       fun prog ->
         prog |> parse |> Cumulative_passes.convert_functions_to_stack
-        |> [%sexp_of: Register_stack_instrs.t Or_error.t] );
-    ( "make-pc-explicit",
+        |> [%sexp_of: Register_stack_instrs.t Or_error.t] |> print_s );
+    ( "make-program-counter-explicit",
       fun prog ->
         prog |> parse |> Cumulative_passes.make_program_counter_explicit
-        |> [%sexp_of: Desmos_virtual_machine.t Or_error.t] );
-    ( "generate-desmos",
+        |> [%sexp_of: Desmos_virtual_machine.t Or_error.t] |> print_s );
+    ( "generate-desmos-output",
       fun prog ->
         prog |> parse |> Cumulative_passes.generate_desmos_output
-        |> [%sexp_of: [ `Unsanitized ] Desmos_output.t Or_error.t] );
-    ( "sanitize-registers",
+        |> [%sexp_of: [ `Unsanitized ] Desmos_output.t Or_error.t] |> print_s );
+    ( "sanitize-register-names",
       fun prog ->
         prog |> parse |> Cumulative_passes.sanitize_register_names
-        |> [%sexp_of: [ `Sanitized ] Desmos_output.t Or_error.t] );
+        |> [%sexp_of: [ `Sanitized ] Desmos_output.t Or_error.t] |> print_s );
   ]
+
+let debug_all_passes =
+ fun prog ->
+  List.iter passes ~f:(fun (name, f) ->
+      print_endline name;
+      f prog;
+      print_endline "\n")
 
 let pass_arg = Command.Arg_type.of_alist_exn passes
 
@@ -97,10 +105,13 @@ let debug_cmd =
   Command.basic
     ~summary:"Run the compiler up to a pass and print the output as a sexp"
     (let%map_open.Command pass =
-       flag "-pass" (required pass_arg) ~doc:"PASS Final pass to run"
+       flag "-pass"
+         (optional_with_default debug_all_passes pass_arg)
+         ~doc:
+           "PASS Final pass to run. If not specified the output of every pass \
+            will be printed."
      and file = anon ("file" %: string) in
-     fun () ->
-       file |> Sexp.load_sexps |> pass |> Sexp.to_string_hum |> print_endline)
+     fun () -> file |> Sexp.load_sexps |> pass)
 
 let () =
   Command_unix.run

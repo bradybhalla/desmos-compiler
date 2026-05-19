@@ -31,7 +31,7 @@ type stmt =
 
 type 'info t = { stmts : stmt list; info : 'info } [@@deriving sexp]
 
-(* TODO: check only has valid symbols and no keywords. should be added to parse_register_name and parse_function_name
+(* TODO brady: check only has valid symbols and no keywords. should be added to parse_register_name and parse_function_name
 
     symbols:
       - can't start with number

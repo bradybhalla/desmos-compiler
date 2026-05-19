@@ -1,8 +1,8 @@
 open! Core
 open Types
 module Types : module type of Types
-(* module Languages : module type of Languages *)
 
+(* TODO brady: this is currently a nice way to expose the languages, but we can no longer directly define intermediate languages in tests. *)
 module Languages : sig
   module C_style_frontend : sig
     type 'a t [@@deriving sexp_of]
@@ -148,5 +148,3 @@ module Desmos_vm_emulator : sig
   val run_until_done : Languages.Desmos_virtual_machine.t -> t
   val inspect_register : t -> Register.t -> float
 end
-
-(* TODO: figure out how to expose languages more safely *)
