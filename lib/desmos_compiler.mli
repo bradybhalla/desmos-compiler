@@ -74,6 +74,10 @@ end
 module Passes : sig
   open Languages
 
+  (* TODO plotting: also check plotting statements (not variables but everything else)
+     - no calls inside them
+     - maybe could even combine this pass with the next one if there is enough repeated logic
+   *)
   val check_function_defs :
     [ `Unchecked ] C_style_frontend.t ->
     [ `Checked_function_defs ] C_style_frontend.t Or_error.t
@@ -82,6 +86,7 @@ module Passes : sig
       - no duplicate function or param names
       - all branches of a function return a value *)
 
+  (* TODO plotting: also extract plotting statements *)
   val extract_function_calls_and_defs :
     [ `Checked_function_defs ] C_style_frontend.t ->
     [ `Unchecked ] C_style_separated_functions.t
@@ -99,11 +104,14 @@ module Passes : sig
       - variables are only used after being declared
       - all variables references are in scope *)
 
+  (* TODO plotting: might want to rething the previous pass and this one. maybe it would be easier to extract all registers and scopes (also checking them), and then go rename them. so the previous pass can compile to C_style_registers Or_error.t and the [`checked/`unchecked] should apply to C_style_registers instead  *)
   val rename_local_variables :
     [ `Checked_variable_scopes ] C_style_separated_functions.t ->
     C_style_registers.t
   (** Rename variables so each variable can be treated as a global register.
       Local variables from functions and inner scopes need to be renamed. *)
+
+  (* TODO plotting: after resolving previous todo, check variable scopes in plotting functions. points should just be global variables. parametric should be global vars plus the given parameter.  *)
 
   val explicate_control : C_style_registers.t -> Register_func_instrs.t
   (** Turn control flow (if/while) into jumps. This pass also changes the
@@ -116,6 +124,8 @@ module Passes : sig
   (** Compile functions and replace call stacks with local per-register stacks.
   *)
 
+  (* TODO compression: add the optimization pass here. to compress I think it only needs to fold over the statements in each block. HOWEVER, it will miss some possible optimization for function calls unless you change how JumpLink is handled  *)
+
   val make_program_counter_explicit :
     Register_stack_instrs.t -> Desmos_virtual_machine.t
   (** Treat the program counter as a normal register which needs to be manually
@@ -126,10 +136,12 @@ module Passes : sig
     Desmos_virtual_machine.t -> [ `Unsanitized ] Desmos_output.t
   (** Turn the virtual machine language into a representation of actual Desmos
       expressions. *)
+  (* TODO plotting: generate plotting statements desmos. parametric ones should rename the parameter with t. *)
 
   val sanitize_register_names :
     [ `Unsanitized ] Desmos_output.t -> [ `Sanitized ] Desmos_output.t
   (** Rename registers so they have valid Desmos names *)
+  (* TODO plotting: expand to plotting statements *)
 end
 
 (** Similar to the `Passes` module but each function starts with the frontend

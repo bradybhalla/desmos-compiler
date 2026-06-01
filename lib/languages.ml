@@ -174,11 +174,44 @@ module Register_stack_instrs = struct
     | GeneralizedSet of (Register.t * generalized_set_action) list
     (* push old values to the stack, and set new values using expression computed with the old values  *)
     (* this is a statement instead of control flow because we know we are coming back. *)
-    (* TODO brady: when doing optimizations, figure out if it actually makes
-       sense to have JumpLink in the middle of a block or to just have it
-       with the other control flow at the end of the block *)
+    (* TODO compression: figure out if it actually makes sense to have JumpLink in the middle of a block or to just have it with the other control flow at the end of the block.*)
     | JumpLink of Label.t
   [@@deriving sexp]
+
+  (* TODO compression: I think we need to fix JumpLink and Return to get the best possible optimization. One idea:
+  - instead of JumpLink, make a new block. push the LabelLine of the next block to the link register
+  - then instead of return we explicitly set the return register and call something like JumpReturn
+
+  Another idea:
+  - JumpLink directly calls pushandset on the program counter. it should probably still go at the end but then we don't need a link register at all
+  - return should still explicitly set the return register and have a control flow like PcPop
+
+  these should allow compression to reduce lots of function call overhead
+
+  if we have set and push seperately should change it to a pushandset so it stays together
+   *)
+
+  (* TODO reordering: what is the optimal way to reorder instructions? for example
+
+  x=1
+  x=x+1
+  y=1
+  y=y+1
+
+  should become
+
+  x=1, y=1
+  x=x+1, y=y+1
+
+  idk if this is the best way, but could write a DAG and greedily take from it. this would let us to compression + reordering in one go which might be simpler
+
+
+  x=1  -> x=x+y
+           ^
+     |-----|
+  y=1  -----------> y=y+1
+
+   *)
 
   type control_flow =
     | Jump of { conds : (expr * Label.t) list; default : Label.t }
