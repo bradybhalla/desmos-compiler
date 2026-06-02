@@ -2,9 +2,12 @@ open! Core
 open Languages
 open Types
 module Rset = Register.Set
+open Register_func_instrs
+
+let label_gen = Label_generator.create "convert_funcs_to_stack"
 
 let rec compile_expr = function
-  | Register_func_instrs.Register r -> Register_stack_instrs.Register r
+  | Register r -> Register_stack_instrs.Register r
   | Num n -> Num n
   | Bool b -> Bool b
   | Add (a, b) -> Add (compile_expr a, compile_expr b)
@@ -26,7 +29,7 @@ let rec compile_expr = function
         }
 
 let compile_control_flow = function
-  | Register_func_instrs.Jump { conds; default } ->
+  | Jump { conds; default } ->
       Register_stack_instrs.Jump
         {
           conds =
@@ -36,13 +39,14 @@ let compile_control_flow = function
   | Return expr -> Return (compile_expr expr)
   | Exit -> Exit
 
-let compile_stmt
-    ~(functions : Register_func_instrs.function_def Function_name.Map.t)
-    ~current_function =
+let compile_stmt ~(functions : function_def Function_name.Map.t)
+    ~current_function (label, stmts_rev, blocks_rev) =
   let open Register_stack_instrs in
   function
   | Register_func_instrs.Set (reg, expr) ->
-      [ GeneralizedSet [ (reg, Set (compile_expr expr)) ] ]
+      ( label,
+        GeneralizedSet [ (reg, Set (compile_expr expr)) ] :: stmts_rev,
+        blocks_rev )
   | Call { func_name; args; ret } ->
       (* we need to save local registers if we are currently inside a function because we might end up in a recursive call. Functions have disjoint sets of registers so this is the only case where it matters. *)
       (* TODO brady: we could make this more efficient by checking if we actually have the potential for a recursive call *)
@@ -71,18 +75,27 @@ let compile_stmt
           |> Set.to_list
           |> List.map ~f:(fun r -> (r, Push))
         in
-        let save_link_register = (link_register, Push) in
-        GeneralizedSet
-          ([ save_link_register ] @ set_args @ save_remaining_clobbered)
+        GeneralizedSet (set_args @ save_remaining_clobbered)
       in
-      let call_function = JumpLink func_info.entry_label in
+      let next_block_label = Label_generator.generate label_gen in
+      let block_before_call =
+        {
+          Register_stack_instrs.label;
+          body = List.rev (save_registers_and_set_args :: stmts_rev);
+          control_flow =
+            JumpLink
+              {
+                target = func_info.entry_label;
+                return_label = next_block_label;
+              };
+        }
+      in
       let restore_registers =
         let restore_saved_registers =
           need_to_save_registers |> Set.to_list
           |> List.map ~f:(fun r -> (r, Pop))
         in
-        let restore_link_register = (link_register, Pop) in
-        GeneralizedSet (restore_link_register :: restore_saved_registers)
+        GeneralizedSet restore_saved_registers
       in
       let store_result =
         ret
@@ -90,35 +103,34 @@ let compile_stmt
                GeneralizedSet [ (reg, Set (Register return_register)) ])
         |> Option.to_list
       in
-      [ save_registers_and_set_args; call_function; restore_registers ]
-      @ store_result
+      ( next_block_label,
+        store_result @ [ restore_registers ],
+        block_before_call :: blocks_rev )
 
-let compile_function_def ~functions (func_name, def) =
-  let open Register_func_instrs in
-  List.map def.blocks ~f:(fun block ->
-      {
-        Register_stack_instrs.label = block.label;
-        body =
-          List.concat_map block.body
-            ~f:(compile_stmt ~functions ~current_function:(Some func_name));
-        control_flow = compile_control_flow block.control_flow;
-      })
+let compile_block ~functions ~current_function block =
+  let label, stmts_rev, additional_blocks_rev =
+    List.fold_left
+      ~f:(fun acc stmt -> compile_stmt ~functions ~current_function acc stmt)
+      ~init:(block.label, [], []) block.body
+  in
+  List.rev
+    ({
+       Register_stack_instrs.label;
+       body = List.rev stmts_rev;
+       control_flow = compile_control_flow block.control_flow;
+     }
+    :: additional_blocks_rev)
 
 let compile { Register_func_instrs.functions; main; global_registers } =
+  Label_generator.reset label_gen;
   let main_blocks =
-    List.map main ~f:(fun block ->
-        {
-          Register_stack_instrs.label = block.label;
-          body =
-            List.concat_map block.body
-              ~f:(compile_stmt ~functions ~current_function:None);
-          control_flow = compile_control_flow block.control_flow;
-        })
+    List.concat_map main ~f:(compile_block ~functions ~current_function:None)
   in
   let function_blocks =
     Map.to_alist functions
-    |> List.concat_map ~f:(fun (name, def) ->
-           compile_function_def ~functions (name, def))
+    |> List.concat_map ~f:(fun (func_name, def) ->
+           List.concat_map def.blocks
+             ~f:(compile_block ~functions ~current_function:(Some func_name)))
   in
   let combined_registers =
     Map.fold functions ~init:global_registers ~f:(fun ~key:_ ~data:def acc ->
@@ -127,7 +139,7 @@ let compile { Register_func_instrs.functions; main; global_registers } =
             "expected register sets to be disjoint. there is probably an issue \
              with register renaming.";
         Set.union acc def.local_registers)
-    |> Set.union (Rset.of_list [ link_register; return_register ])
+    |> Set.union (Rset.singleton return_register)
   in
   {
     Register_stack_instrs.blocks = main_blocks @ function_blocks;

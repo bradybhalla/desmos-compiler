@@ -78,6 +78,10 @@ let passes =
       fun prog ->
         prog |> parse |> Cumulative_passes.convert_functions_to_stack
         |> [%sexp_of: Register_stack_instrs.t Or_error.t] |> print_s );
+    ( "compress-instructions",
+      fun prog ->
+        prog |> parse |> Cumulative_passes.compress_instructions
+        |> [%sexp_of: Register_stack_instrs.t Or_error.t] |> print_s );
     ( "make-program-counter-explicit",
       fun prog ->
         prog |> parse |> Cumulative_passes.make_program_counter_explicit

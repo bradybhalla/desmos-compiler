@@ -166,55 +166,16 @@ module Register_stack_instrs = struct
     | If_expr of { conds : (expr * expr) list; default : expr }
   [@@deriving sexp]
 
-  (* TODO brady: pushandset is unneeded, we can just have a push and a set *)
+  (* TODO brady: figure out which of the stack instrucitons are actually needed and remove others, propagate down *)
   type generalized_set_action = Set of expr | PushAndSet of expr | Push | Pop
   [@@deriving sexp]
 
-  type stmt =
-    | GeneralizedSet of (Register.t * generalized_set_action) list
-    (* push old values to the stack, and set new values using expression computed with the old values  *)
-    (* this is a statement instead of control flow because we know we are coming back. *)
-    (* TODO compression: figure out if it actually makes sense to have JumpLink in the middle of a block or to just have it with the other control flow at the end of the block.*)
-    | JumpLink of Label.t
+  type stmt = GeneralizedSet of (Register.t * generalized_set_action) list
   [@@deriving sexp]
-
-  (* TODO compression: I think we need to fix JumpLink and Return to get the best possible optimization. One idea:
-  - instead of JumpLink, make a new block. push the LabelLine of the next block to the link register
-  - then instead of return we explicitly set the return register and call something like JumpReturn
-
-  Another idea:
-  - JumpLink directly calls pushandset on the program counter. it should probably still go at the end but then we don't need a link register at all
-  - return should still explicitly set the return register and have a control flow like PcPop
-
-  these should allow compression to reduce lots of function call overhead
-
-  if we have set and push seperately should change it to a pushandset so it stays together
-   *)
-
-  (* TODO reordering: what is the optimal way to reorder instructions? for example
-
-  x=1
-  x=x+1
-  y=1
-  y=y+1
-
-  should become
-
-  x=1, y=1
-  x=x+1, y=y+1
-
-  idk if this is the best way, but could write a DAG and greedily take from it. this would let us to compression + reordering in one go which might be simpler
-
-
-  x=1  -> x=x+y
-           ^
-     |-----|
-  y=1  -----------> y=y+1
-
-   *)
 
   type control_flow =
     | Jump of { conds : (expr * Label.t) list; default : Label.t }
+    | JumpLink of { target : Label.t; return_label : Label.t }
     | Return of expr
     | Exit
   [@@deriving sexp]
@@ -251,7 +212,12 @@ module Desmos_virtual_machine = struct
     | If_expr of { conds : (expr * expr) list; default : expr }
   [@@deriving sexp]
 
-  type generalized_set_action = Set of expr | PushAndSet of expr | Push | Pop
+  type generalized_set_action =
+    | Set of expr
+    | PushAndSet of expr
+    | PushExprAndSet of { push : expr; set : expr }
+    | Push
+    | Pop
   [@@deriving sexp]
 
   (* TODO brady: for optimizations it might be kind of hard to determine if

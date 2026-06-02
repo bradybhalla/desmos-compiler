@@ -40,12 +40,6 @@ let compile_body_stmt = function
       Instruction
         ((program_counter_reg, Set (Add (Register program_counter_reg, Num 1.)))
         :: sets)
-  | JumpLink lbl ->
-      Instruction
-        [
-          (link_register, Set (Add (Register program_counter_reg, Num 1.)));
-          (program_counter_reg, Set (LabelLineNumber lbl));
-        ]
 
 let compile_control_flow = function
   | Register_stack_instrs.Jump { conds; default } ->
@@ -61,11 +55,20 @@ let compile_control_flow = function
                  { conds = compiled_conds; default = LabelLineNumber default })
           );
         ]
+  | JumpLink { target; return_label } ->
+      Instruction
+        [
+          ( program_counter_reg,
+            PushExprAndSet
+              {
+                push = LabelLineNumber return_label;
+                set = LabelLineNumber target;
+              } );
+        ]
   | Return expr ->
       Instruction
         [
-          (return_register, Set (compile_expr expr));
-          (program_counter_reg, Set (Register link_register));
+          (return_register, Set (compile_expr expr)); (program_counter_reg, Pop);
         ]
   | Exit -> Desmos_virtual_machine.Exit
 

@@ -38,8 +38,7 @@ let%expect_test "sanitize register names" =
          ((Eq (Register 00pc) (Num 1)) ((00pc (Num -1))))))
        (default ((00pc (Register 00pc))))))
      (init_registers
-      ((00link (Num 1.2345)) (200linkStack (ListLiteral ((Num 5.4321))))
-       (00pc (Num 0)) (200pcStack (ListLiteral ((Num 5.4321))))
+      ((00pc (Num 0)) (200pcStack (ListLiteral ((Num 5.4321))))
        (00ret (Num 1.2345)) (200retStack (ListLiteral ((Num 5.4321))))
        (aa0 (Num 1.2345)) (2aaStack0 (ListLiteral ((Num 5.4321))))
        (a (Num 1.2345)) (2aStack (ListLiteral ((Num 5.4321))))

@@ -124,7 +124,9 @@ module Passes : sig
   (** Compile functions and replace call stacks with local per-register stacks.
   *)
 
-  (* TODO compression: add the optimization pass here. to compress I think it only needs to fold over the statements in each block. HOWEVER, it will miss some possible optimization for function calls unless you change how JumpLink is handled  *)
+  val compress_instructions : Register_stack_instrs.t -> Register_stack_instrs.t
+  (** Compress instructions by combining GeneralizedSet statements within each
+      block. *)
 
   val make_program_counter_explicit :
     Register_stack_instrs.t -> Desmos_virtual_machine.t
@@ -169,6 +171,9 @@ module Cumulative_passes : sig
     [ `Unchecked ] C_style_frontend.t -> Register_func_instrs.t Or_error.t
 
   val convert_functions_to_stack :
+    [ `Unchecked ] C_style_frontend.t -> Register_stack_instrs.t Or_error.t
+
+  val compress_instructions :
     [ `Unchecked ] C_style_frontend.t -> Register_stack_instrs.t Or_error.t
 
   val make_program_counter_explicit :

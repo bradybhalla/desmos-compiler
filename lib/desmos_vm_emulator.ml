@@ -110,7 +110,10 @@ let step t =
       let values_to_set =
         List.filter_map sets ~f:(fun (reg, set) ->
             match set with
-            | Set expr | PushAndSet expr -> Some (reg, eval_expr expr ~t)
+            | Set expr
+            | PushAndSet expr
+            | PushExprAndSet { push = _; set = expr } ->
+                Some (reg, eval_expr expr ~t)
             | Push | Pop -> None)
       in
       (* push/pop registers as needed *)
@@ -121,6 +124,11 @@ let step t =
               let cur_stack = Hashtbl.find_exn t.register_stacks reg in
               let cur_val = Hashtbl.find_exn t.registers reg in
               Hashtbl.set t.register_stacks ~key:reg ~data:(cur_val :: cur_stack)
+          | PushExprAndSet { push; set = _ } ->
+              let cur_stack = Hashtbl.find_exn t.register_stacks reg in
+              let push_val = eval_expr push ~t in
+              Hashtbl.set t.register_stacks ~key:reg
+                ~data:(push_val :: cur_stack)
           | Pop ->
               let cur_stack = Hashtbl.find_exn t.register_stacks reg in
               Hashtbl.set t.registers ~key:reg ~data:(List.hd_exn cur_stack);

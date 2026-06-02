@@ -13,6 +13,7 @@ module Passes = struct
   let rename_local_variables = Pass_rename_local_variables.compile
   let explicate_control = Pass_explicate_control.compile
   let convert_functions_to_stack = Pass_convert_functions_to_stack.compile
+  let compress_instructions = Pass_compress_instructions.compile
   let make_program_counter_explicit = Pass_make_program_counter_explicit.compile
   let generate_desmos_output = Pass_generate_desmos_output.compile
   let sanitize_register_names = Pass_sanitize_register_names.compile
@@ -38,8 +39,11 @@ module Cumulative_passes = struct
   let convert_functions_to_stack prog =
     prog |> explicate_control >>| Passes.convert_functions_to_stack
 
+  let compress_instructions prog =
+    prog |> convert_functions_to_stack >>| Passes.compress_instructions
+
   let make_program_counter_explicit prog =
-    prog |> convert_functions_to_stack >>| Passes.make_program_counter_explicit
+    prog |> compress_instructions >>| Passes.make_program_counter_explicit
 
   let generate_desmos_output prog =
     prog |> make_program_counter_explicit >>| Passes.generate_desmos_output

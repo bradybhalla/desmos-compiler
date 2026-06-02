@@ -63,6 +63,11 @@ let compile_generalized_set reg action label_map : set list =
         (stack_reg, ListJoin (Register stack_reg, Register reg));
         (reg, compile_expr label_map expr);
       ]
+  | PushExprAndSet { push; set } ->
+      [
+        (stack_reg, ListJoin (Register stack_reg, compile_expr label_map push));
+        (reg, compile_expr label_map set);
+      ]
   | Push -> [ (stack_reg, ListJoin (Register stack_reg, Register reg)) ]
   | Pop ->
       [
