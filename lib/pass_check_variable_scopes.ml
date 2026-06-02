@@ -119,13 +119,13 @@ let compile
     {
       C_style_separated_functions.functions;
       main;
-      desmos_decls;
-      desmos_plot;
+      desmos_vars;
+      desmos_plots;
       status = `Unchecked;
     } =
   let open Or_error.Let_syntax in
   let desmos_decl_vars =
-    List.map desmos_decls
+    List.map desmos_vars
       ~f:(fun (d : C_style_separated_functions.desmos_decl) -> d.reg)
     |> Register.Set.of_list
   in
@@ -144,7 +144,7 @@ let compile
     |> Or_error.combine_errors_unit
   in
   let%bind () =
-    desmos_plot
+    desmos_plots
     |> List.map ~f:(check_desmos_plot ~global_vars)
     |> Or_error.combine_errors_unit
   in
@@ -152,7 +152,7 @@ let compile
     {
       C_style_separated_functions.functions;
       main;
-      desmos_decls;
-      desmos_plot;
+      desmos_vars;
+      desmos_plots;
       status = `Valid;
     }

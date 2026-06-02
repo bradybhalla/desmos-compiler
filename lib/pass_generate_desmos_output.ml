@@ -15,6 +15,7 @@ let build_label_map blocks =
 let true_lit = Num 1.
 let false_lit = Num 0.
 
+(* TODO brady: not every register needs a stack, so we should find a better way to represent all the different register properties *)
 let get_stack_register reg =
   (* TODO: right now nothing else should start with 2, but maybe there is a better way to enforce the uniqueness here *)
   Register.of_string ("2" ^ Register.to_string reg ^ "Stack")
@@ -98,6 +99,20 @@ let compile_stmt label_map idx stmt =
       in
       [ (pc_eq_i, reg_sets) ]
 
+let compile_desmos_plot label_map = function
+  | Desmos_virtual_machine.Point { x; y; args } ->
+      Desmos_output.Point
+        { x = compile_expr label_map x; y = compile_expr label_map y; args }
+  | Line { x1; y1; x2; y2; args } ->
+      Line
+        {
+          x1 = compile_expr label_map x1;
+          y1 = compile_expr label_map y1;
+          x2 = compile_expr label_map x2;
+          y2 = compile_expr label_map y2;
+          args;
+        }
+
 let compile (program : Desmos_virtual_machine.t) =
   let label_map = build_label_map program.main in
   let _, conds =
@@ -112,16 +127,41 @@ let compile (program : Desmos_virtual_machine.t) =
   let program_action =
     { conds; default = [ (program_counter_reg, Register program_counter_reg) ] }
   in
-  let init_registers =
-    Map.to_alist program.registers
-    |> List.concat_map ~f:(fun (reg, init_expr) ->
-           [
-             (reg, compile_expr label_map init_expr);
-             (* TODO brady: right now magic numbers will show if something goes wrong.
-                Every stack starts with an element so valid code should never be able
-                to remove it. This is also useful because our current "pop" function
-                doesn't work for lists of size 0/1. *)
-             (get_stack_register reg, ListLiteral [ Num 5.4321 ]);
-           ])
+  let external_regs =
+    program.desmos_vars
+    |> List.map ~f:(fun (d : Desmos_virtual_machine.desmos_decl) -> d.reg)
+    |> Register.Set.of_list
   in
-  { program_action; init_registers; status = `Unsanitized }
+  let internal =
+    Map.to_alist program.registers
+    |> List.filter_map ~f:(fun (reg, init_expr) ->
+           if Set.mem external_regs reg then None
+           else
+             let init =
+               match init_expr with
+               | Desmos_virtual_machine.Num n -> n
+               | _ -> failwith "expected numeric init for internal register"
+             in
+             Some
+               {
+                 C_style_separated_functions.reg;
+                 init;
+                 args = Desmos_slider_args.default;
+               })
+  in
+  let stack_inits =
+    Map.keys program.registers
+    |> List.map ~f:(fun reg ->
+           (* TODO brady: right now magic numbers will show if something goes wrong.
+              Every stack starts with an element so valid code should never be able
+              to remove it. This is also useful because our current "pop" function
+              doesn't work for lists of size 0/1. *)
+           (get_stack_register reg, ListLiteral [ Num 5.4321 ]))
+  in
+  {
+    program_action;
+    init_registers = { external_ = program.desmos_vars; internal };
+    stack_inits;
+    desmos_plots = List.map program.desmos_plots ~f:(compile_desmos_plot label_map);
+    status = `Unsanitized;
+  }

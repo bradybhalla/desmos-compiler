@@ -24,7 +24,7 @@ let%expect_test "simple variable assignment" =
          ((GeneralizedSet
            ((x (Set (Num 5))) (y (Set (Num 5))) (z (Set (Num 5)))))))
         (control_flow Exit))))
-     (registers (00ret x y z)))
+     (registers (00ret x y z)) (desmos_vars ()) (desmos_plots ()))
     |}]
 
 let%expect_test "set z at the beginning" =
@@ -45,7 +45,7 @@ let%expect_test "set z at the beginning" =
          ((GeneralizedSet ((x (Set (Num 5))) (z (Set (Num 5)))))
           (GeneralizedSet ((y (Set (Add (Register x) (Num 2))))))))
         (control_flow Exit))))
-     (registers (00ret x y z)))
+     (registers (00ret x y z)) (desmos_vars ()) (desmos_plots ()))
     |}]
 
 let%expect_test "set y/z together" =
@@ -66,7 +66,7 @@ let%expect_test "set y/z together" =
          ((GeneralizedSet ((x (Set (Num 5)))))
           (GeneralizedSet ((y (Set (Register x))) (z (Set (Register x)))))))
         (control_flow Exit))))
-     (registers (00ret x y z)))
+     (registers (00ret x y z)) (desmos_vars ()) (desmos_plots ()))
     |}]
 
 let%expect_test "set variable multiple times" =
@@ -99,7 +99,7 @@ let%expect_test "set variable multiple times" =
            ((x (Set (Add (Register x) (Register x))))
             (y (Set (Add (Register y) (Register y))))))))
         (control_flow Exit))))
-     (registers (00ret x y)))
+     (registers (00ret x y)) (desmos_vars ()) (desmos_plots ()))
     |}]
 
 let%expect_test "function call" =
@@ -120,5 +120,5 @@ let%expect_test "function call" =
         (control_flow Exit))
        ((label explicate_control_f_entry_1) (body ())
         (control_flow (Return (Add (Register 1local_x_0) (Num 1)))))))
-     (registers (00ret 1local_x_0)))
+     (registers (00ret 1local_x_0)) (desmos_vars ()) (desmos_plots ()))
     |}]

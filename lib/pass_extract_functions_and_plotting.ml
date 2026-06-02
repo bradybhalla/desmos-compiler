@@ -246,6 +246,6 @@ let compile
     C_style_separated_functions.functions;
     main = List.concat_map ~f:compile_stmt program;
     status = `Unchecked;
-    desmos_decls = List.filter_map ~f:extract_desmos_decl program;
-    desmos_plot = List.filter_map ~f:extract_desmos_plot program;
+    desmos_vars = List.filter_map ~f:extract_desmos_decl program;
+    desmos_plots = List.filter_map ~f:extract_desmos_plot program;
   }

@@ -102,7 +102,9 @@ let compile_block ~functions ~current_function block =
      }
     :: additional_blocks_rev)
 
-let compile { Register_func_instrs.functions; main; global_registers } =
+let compile
+    { Register_func_instrs.functions; main; global_registers; desmos_vars;
+      desmos_plots } =
   Label_generator.reset label_gen;
   let main_blocks =
     List.concat_map main ~f:(compile_block ~functions ~current_function:None)
@@ -125,4 +127,6 @@ let compile { Register_func_instrs.functions; main; global_registers } =
   {
     Register_stack_instrs.blocks = main_blocks @ function_blocks;
     registers = combined_registers;
+    desmos_vars;
+    desmos_plots;
   }

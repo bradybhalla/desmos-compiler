@@ -88,25 +88,54 @@ let latex_of_action { conds; default } =
       String.concat ~sep:", " conds_latex ^ ", " ^ latex_of_set_list default
       |> latex_wrap_lr "\\{" "\\}"
 
+let decl_to_set (d : desmos_decl) : set = (d.reg, Num d.init)
+
+(* TODO plotting: should make an internal representation of the desmos expression type and generate those, right now this is much more error prone and won't let me add args so lines will be wrong.  *)
+let latex_of_plot =
+  let latex_of_point x y =
+    latex_of_expr x ^ ", " ^ latex_of_expr y |> latex_wrap_paren
+  in
+  function
+  | Point { x; y; args = () } -> latex_of_point x y
+  | Line { x1; y1; x2; y2; args = () } ->
+      latex_of_point x1 y1 ^ ", " ^ latex_of_point x2 y2
+      |> latex_wrap_lr "[" "]"
+
 let compile
-    ({ program_action; init_registers; status = `Sanitized } : [ `Sanitized ] t)
-    : Javascript_setup.t =
+    ({
+       program_action;
+       init_registers = { external_; internal };
+       stack_inits;
+       desmos_plots;
+       status = `Sanitized;
+     } :
+      [ `Sanitized ] t) : Javascript_setup.t =
   let program_desmos_line = "M_{ain} = " ^ latex_of_action program_action in
+  (* don't reset external vars *)
   let reset_desmos_line =
     "R_{eset} = "
     ^ latex_of_action
-        {
-          conds = [];
-          default = List.map init_registers ~f:(fun (reg, expr) -> (reg, expr));
-        }
+        { conds = []; default = List.map internal ~f:decl_to_set @ stack_inits }
   in
-  let register_desmos_lines =
-    List.map init_registers ~f:(fun (reg, expr) ->
+  let external_desmos_lines =
+    List.map external_ ~f:(fun d ->
+        latex_of_register d.reg ^ "=" ^ latex_of_expr (Num d.init))
+  in
+  let plots = List.map desmos_plots ~f:latex_of_plot in
+  let internal_desmos_lines =
+    List.map internal ~f:(fun d ->
+        latex_of_register d.reg ^ "=" ^ latex_of_expr (Num d.init))
+  in
+  let stack_desmos_lines =
+    List.map stack_inits ~f:(fun (reg, expr) ->
         latex_of_register reg ^ "=" ^ latex_of_expr expr)
   in
+  let all_lines =
+    [ program_desmos_line; reset_desmos_line ]
+    @ external_desmos_lines @ plots @ internal_desmos_lines @ stack_desmos_lines
+  in
   let json_equations =
-    List.map (program_desmos_line :: reset_desmos_line :: register_desmos_lines)
-      ~f:(fun str ->
+    List.map all_lines ~f:(fun str ->
         let escaped =
           String.substr_replace_all ~pattern:"\\" ~with_:"\\\\" str
         in

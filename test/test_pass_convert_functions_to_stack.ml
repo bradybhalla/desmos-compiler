@@ -41,5 +41,6 @@ let%expect_test "register saving and restoring at correct call sites" =
        ((label convert_funcs_to_stack_1)
         (body ((GeneralizedSet ((1local_y_0 Pop) (1local_z_1 Pop)))))
         (control_flow (Return (Register 1local_z_1))))))
-     (registers (00ret 1local_y_0 1local_z_1 y z)))
+     (registers (00ret 1local_y_0 1local_z_1 y z)) (desmos_vars ())
+     (desmos_plots ()))
     |}]

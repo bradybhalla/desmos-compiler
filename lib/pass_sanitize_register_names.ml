@@ -3,8 +3,7 @@ open Languages
 open Types
 open Desmos_output
 
-let build_rename_map init_registers =
-  let all_registers = List.map init_registers ~f:fst in
+let build_rename_map all_registers =
   let clean, dirty =
     List.partition_tf all_registers ~f:(fun reg ->
         not (String.mem (Register.to_string reg) '_'))
@@ -61,14 +60,37 @@ let rec rename_expr rename_map = function
 let rename_set rename_map (reg, expr) =
   (rename_reg rename_map reg, rename_expr rename_map expr)
 
+let rename_decl rename_map (d : desmos_decl) =
+  { d with reg = rename_reg rename_map d.reg }
+
+let rename_desmos_plot rename_map = function
+  | Point { x; y; args } ->
+      Point { x = rename_expr rename_map x; y = rename_expr rename_map y; args }
+  | Line { x1; y1; x2; y2; args } ->
+      Line
+        {
+          x1 = rename_expr rename_map x1;
+          y1 = rename_expr rename_map y1;
+          x2 = rename_expr rename_map x2;
+          y2 = rename_expr rename_map y2;
+          args;
+        }
+
 let compile
     ({
        program_action = { conds; default };
-       init_registers;
+       init_registers = { external_; internal };
+       stack_inits;
+       desmos_plots;
        status = `Unsanitized;
      } :
       [ `Unsanitized ] t) : [ `Sanitized ] t =
-  let rename_map = build_rename_map init_registers in
+  let all_registers =
+    List.map external_ ~f:(fun d -> d.reg)
+    @ List.map internal ~f:(fun d -> d.reg)
+    @ List.map stack_inits ~f:fst
+  in
+  let rename_map = build_rename_map all_registers in
   {
     program_action =
       {
@@ -78,6 +100,12 @@ let compile
                 List.map sets ~f:(rename_set rename_map) ));
         default = List.map default ~f:(rename_set rename_map);
       };
-    init_registers = List.map init_registers ~f:(rename_set rename_map);
+    init_registers =
+      {
+        external_ = List.map external_ ~f:(rename_decl rename_map);
+        internal = List.map internal ~f:(rename_decl rename_map);
+      };
+    stack_inits = List.map stack_inits ~f:(rename_set rename_map);
+    desmos_plots = List.map desmos_plots ~f:(rename_desmos_plot rename_map);
     status = `Sanitized;
   }

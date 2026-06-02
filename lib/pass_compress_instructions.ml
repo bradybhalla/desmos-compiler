@@ -113,12 +113,14 @@ let construct_stmts stmts =
   |> List.map ~f:apply_constructor
 
 (* TODO: remove this if statement*)
-let compile { blocks; registers } =
-  if false then { blocks; registers }
+let compile { blocks; registers; desmos_vars; desmos_plots } =
+  if false then { blocks; registers; desmos_vars; desmos_plots }
   else
     {
       blocks =
         List.map blocks ~f:(fun { label; body; control_flow } ->
             { label; body = construct_stmts body; control_flow });
       registers;
+      desmos_vars;
+      desmos_plots;
     }

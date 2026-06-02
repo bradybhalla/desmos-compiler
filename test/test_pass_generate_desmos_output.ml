@@ -93,14 +93,19 @@ let%expect_test "simple program" =
              (Sub (ListLength (Register 200pcStack)) (Num 1))))))))
        (default ((00pc (Register 00pc))))))
      (init_registers
-      ((00pc (Num 0)) (200pcStack (ListLiteral ((Num 5.4321))))
-       (00ret (Num 1.2345)) (200retStack (ListLiteral ((Num 5.4321))))
-       (1local_1extract_call_0_2 (Num 1.2345))
+      ((external_ ())
+       (internal
+        (((reg 00pc) (init 0) (args ())) ((reg 00ret) (init 1.2345) (args ()))
+         ((reg 1local_1extract_call_0_2) (init 1.2345) (args ()))
+         ((reg 1local_1extract_ifexpr_1_1) (init 1.2345) (args ()))
+         ((reg 1local_x_0) (init 1.2345) (args ()))))))
+     (stack_inits
+      ((200pcStack (ListLiteral ((Num 5.4321))))
+       (200retStack (ListLiteral ((Num 5.4321))))
        (21local_1extract_call_0_2Stack (ListLiteral ((Num 5.4321))))
-       (1local_1extract_ifexpr_1_1 (Num 1.2345))
        (21local_1extract_ifexpr_1_1Stack (ListLiteral ((Num 5.4321))))
-       (1local_x_0 (Num 1.2345)) (21local_x_0Stack (ListLiteral ((Num 5.4321))))))
-     (status Unsanitized))
+       (21local_x_0Stack (ListLiteral ((Num 5.4321))))))
+     (desmos_plots ()) (status Unsanitized))
     |}]
 
 (* let%expect_test "multiple instructions" = *)

@@ -26,7 +26,7 @@ let%expect_test "if" =
          (Jump (conds ()) (default explicate_control_if_statement_exit_1))))
        ((label explicate_control_if_statement_exit_1) (body ((Set x (Num 1))))
         (control_flow Exit))))
-     (global_registers (x)))
+     (global_registers (x)) (desmos_vars ()) (desmos_plots ()))
     |}]
 
 let%expect_test "if / elif" =
@@ -58,7 +58,7 @@ let%expect_test "if / elif" =
          (Jump (conds ()) (default explicate_control_if_statement_exit_1))))
        ((label explicate_control_if_statement_exit_1) (body ((Set x (Num 1))))
         (control_flow Exit))))
-     (global_registers (x)))
+     (global_registers (x)) (desmos_vars ()) (desmos_plots ()))
     |}]
 
 let%expect_test "if / else" =
@@ -87,7 +87,7 @@ let%expect_test "if / else" =
          (Jump (conds ()) (default explicate_control_if_statement_exit_1))))
        ((label explicate_control_if_statement_exit_1) (body ((Set x (Num 1))))
         (control_flow Exit))))
-     (global_registers (x)))
+     (global_registers (x)) (desmos_vars ()) (desmos_plots ()))
     |}]
 
 let%expect_test "if / elif / else" =
@@ -123,7 +123,7 @@ let%expect_test "if / elif / else" =
          (Jump (conds ()) (default explicate_control_if_statement_exit_1))))
        ((label explicate_control_if_statement_exit_1) (body ())
         (control_flow Exit))))
-     (global_registers (x)))
+     (global_registers (x)) (desmos_vars ()) (desmos_plots ()))
     |}]
 
 let%expect_test "function where all branches return (nested if)" =
@@ -170,7 +170,7 @@ let%expect_test "function where all branches return (nested if)" =
             (control_flow Exit))))
          (local_registers (1local_x_0))))))
      (main (((label explicate_control_main_0) (body ()) (control_flow Exit))))
-     (global_registers ()))
+     (global_registers ()) (desmos_vars ()) (desmos_plots ()))
     |}]
 
 let%expect_test "while loop" =
@@ -200,5 +200,5 @@ let%expect_test "while loop" =
           (default explicate_control_while_end_1))))
        ((label explicate_control_while_end_1) (body ((Set x (Num 1))))
         (control_flow Exit))))
-     (global_registers (x)))
+     (global_registers (x)) (desmos_vars ()) (desmos_plots ()))
     |}]

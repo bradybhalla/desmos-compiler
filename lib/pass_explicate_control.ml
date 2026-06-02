@@ -157,7 +157,23 @@ let rec compile_statements ~cur_label ~default_next ~stmts_rev ~blocks_rev =
           compile_statements ~cur_label ~default_next
             ~stmts_rev:(stmt :: stmts_rev) ~blocks_rev rest)
 
-let compile C_style_registers.{ functions; main; global_registers; _ } =
+let compile_desmos_plot = function
+  | C_style_separated_functions.Point { x; y; args } ->
+      Register_func_instrs.Point
+        { x = compile_expr x; y = compile_expr y; args }
+  | Line { x1; y1; x2; y2; args } ->
+      Line
+        {
+          x1 = compile_expr x1;
+          y1 = compile_expr y1;
+          x2 = compile_expr x2;
+          y2 = compile_expr y2;
+          args;
+        }
+
+let compile
+    C_style_registers.
+      { functions; main; global_registers; desmos_vars; desmos_plots } =
   Label_generator.reset label_gen;
   Register_func_instrs.
     {
@@ -178,4 +194,6 @@ let compile C_style_registers.{ functions; main; global_registers; _ } =
          compile_statements ~cur_label:entry_label ~default_next:(Some Exit)
            ~stmts_rev:[] ~blocks_rev:[] main);
       global_registers;
+      desmos_vars;
+      desmos_plots = List.map desmos_plots ~f:compile_desmos_plot;
     }

@@ -46,9 +46,8 @@ module Languages : sig
       - GeneralizedSet a list of (register,expression) pairs. All expressions
         are computed before any register is set, and there is an option to
         push/pop register values.
-      - JumpLink will set the link register to the next line and jump to the
-        label. This is the only control flow that can go in the middle of a
-        block, which is allowed because the program will eventually return here.
+      - JumpLink will set the link register to a return label and jump to the
+        target label.
       - Return will set the program counter to the link register value. *)
   module Register_stack_instrs : sig
     type t [@@deriving sexp_of]

@@ -78,7 +78,22 @@ let compile_block (block : Register_stack_instrs.block) =
   let control_flow = compile_control_flow block.control_flow in
   { Desmos_virtual_machine.label = block.label; body = body @ [ control_flow ] }
 
-let compile { Register_stack_instrs.blocks; registers } =
+let compile_desmos_plot = function
+  | Register_func_instrs.Point { x; y; args } ->
+      Desmos_virtual_machine.Point
+        { x = compile_expr x; y = compile_expr y; args }
+  | Line { x1; y1; x2; y2; args } ->
+      Line
+        {
+          x1 = compile_expr x1;
+          y1 = compile_expr y1;
+          x2 = compile_expr x2;
+          y2 = compile_expr y2;
+          args;
+        }
+
+let compile { Register_stack_instrs.blocks; registers; desmos_vars;
+              desmos_plots } =
   let initial_registers =
     Set.add registers program_counter_reg
     |> Set.to_map ~f:(fun reg ->
@@ -90,4 +105,6 @@ let compile { Register_stack_instrs.blocks; registers } =
   {
     Desmos_virtual_machine.main = List.map blocks ~f:compile_block;
     registers = initial_registers;
+    desmos_vars;
+    desmos_plots = List.map desmos_plots ~f:compile_desmos_plot;
   }
