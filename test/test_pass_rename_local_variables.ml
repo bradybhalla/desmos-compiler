@@ -75,5 +75,6 @@ let%expect_test "rename local variables" =
            (body
             ((Set 1local_s_0 (Register y))
              (Set y (Sub (Register 1local_s_0) (Num 1)))))))))))
-     (global_registers (1local_r_1 1local_s_0 x y)))
+     (global_registers (1local_r_1 1local_s_0 x y)) (desmos_decls ())
+     (desmos_plot ()))
     |}]

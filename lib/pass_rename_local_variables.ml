@@ -35,9 +35,8 @@ let merge_override =
         Some v)
 
 let compile
-    ({ functions; main; info = `Checked_variable_scopes } :
-      [ `Checked_variable_scopes ] C_style_separated_functions.t) :
-    C_style_registers.t =
+    ({ functions; main; desmos_decls; desmos_plot; status = `Valid } :
+      [ `Valid ] C_style_separated_functions.t) : C_style_registers.t =
   let register_gen = Register_generator.create "local" in
   Register_generator.reset register_gen;
   let global_registers = Register.Hash_set.create () in
@@ -112,12 +111,20 @@ let compile
         (stmts @ new_stmts, cur_names))
       ~init:([], Register.Map.empty)
   in
+  let desmos_decl_names =
+    List.fold desmos_decls ~init:Register.Map.empty
+      ~f:(fun map (d : C_style_separated_functions.desmos_decl) ->
+        Map.add_exn map ~key:d.reg ~data:(register_global d.reg))
+  in
   let main, global_names =
-    rename_in_stmts ~parent_names:Register.Map.empty ~is_global:true
+    rename_in_stmts ~parent_names:desmos_decl_names ~is_global:true
       ~local_set:global_registers main
   in
+  let global_names = merge_override desmos_decl_names global_names in
   {
     main;
+    desmos_decls;
+    desmos_plot;
     functions =
       Map.map functions ~f:(fun { params; body } ->
           let func_registers = Register.Hash_set.create () in

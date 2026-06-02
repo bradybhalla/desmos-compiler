@@ -62,12 +62,17 @@ module Languages : sig
   end
 
   (** Desmos expressions that will simulate the program when the main action is
-      repeatedly run. This language prints out JavaScript code that will insert
-      all necessary expressions in Desmos when pasted into the console. *)
+      repeatedly run. *)
   module Desmos_output : sig
     type 'a t [@@deriving sexp_of]
+  end
 
-    val to_pastable_javascript : [ `Sanitized ] t -> string
+  (** This language prints out JavaScript code that will insert all necessary
+      expressions in Desmos when pasted into the console. *)
+  module Javascript_setup : sig
+    type t [@@deriving sexp_of]
+
+    val to_string : t -> string
   end
 end
 
@@ -78,17 +83,17 @@ module Passes : sig
      - no calls inside them
      - maybe could even combine this pass with the next one if there is enough repeated logic
    *)
-  val check_function_defs :
+  val check_function_defs_and_plotting :
     [ `Unchecked ] C_style_frontend.t ->
-    [ `Checked_function_defs ] C_style_frontend.t Or_error.t
+    [ `Valid ] C_style_frontend.t Or_error.t
   (** Error checking pass that ensures
       - function defs only in global scope
       - no duplicate function or param names
       - all branches of a function return a value *)
 
   (* TODO plotting: also extract plotting statements *)
-  val extract_function_calls_and_defs :
-    [ `Checked_function_defs ] C_style_frontend.t ->
+  val extract_functions_and_plotting :
+    [ `Valid ] C_style_frontend.t ->
     [ `Unchecked ] C_style_separated_functions.t
   (** When a function call is inside of a complex expression, move it to a
       separate statement which saves the value to a register first. An important
@@ -99,15 +104,14 @@ module Passes : sig
 
   val check_variables_scopes :
     [ `Unchecked ] C_style_separated_functions.t ->
-    [ `Checked_variable_scopes ] C_style_separated_functions.t Or_error.t
+    [ `Valid ] C_style_separated_functions.t Or_error.t
   (** Error checking pass that ensures
       - variables are only used after being declared
       - all variables references are in scope *)
 
   (* TODO plotting: might want to rething the previous pass and this one. maybe it would be easier to extract all registers and scopes (also checking them), and then go rename them. so the previous pass can compile to C_style_registers Or_error.t and the [`checked/`unchecked] should apply to C_style_registers instead  *)
   val rename_local_variables :
-    [ `Checked_variable_scopes ] C_style_separated_functions.t ->
-    C_style_registers.t
+    [ `Valid ] C_style_separated_functions.t -> C_style_registers.t
   (** Rename variables so each variable can be treated as a global register.
       Local variables from functions and inner scopes need to be renamed. *)
 
@@ -144,6 +148,9 @@ module Passes : sig
     [ `Unsanitized ] Desmos_output.t -> [ `Sanitized ] Desmos_output.t
   (** Rename registers so they have valid Desmos names *)
   (* TODO plotting: expand to plotting statements *)
+
+  val generate_javascript : [ `Sanitized ] Desmos_output.t -> Javascript_setup.t
+  (** Convert Desmos output to pastable JavaScript *)
 end
 
 (** Similar to the `Passes` module but each function starts with the frontend
@@ -152,17 +159,17 @@ end
 module Cumulative_passes : sig
   open Languages
 
-  val check_function_defs :
+  val check_function_defs_and_plotting :
     [ `Unchecked ] C_style_frontend.t ->
-    [ `Checked_function_defs ] C_style_frontend.t Or_error.t
+    [ `Valid ] C_style_frontend.t Or_error.t
 
-  val extract_function_calls_and_defs :
+  val extract_functions_and_plotting :
     [ `Unchecked ] C_style_frontend.t ->
     [ `Unchecked ] C_style_separated_functions.t Or_error.t
 
   val check_variables_scopes :
     [ `Unchecked ] C_style_frontend.t ->
-    [ `Checked_variable_scopes ] C_style_separated_functions.t Or_error.t
+    [ `Valid ] C_style_separated_functions.t Or_error.t
 
   val rename_local_variables :
     [ `Unchecked ] C_style_frontend.t -> C_style_registers.t Or_error.t
@@ -186,6 +193,9 @@ module Cumulative_passes : sig
   val sanitize_register_names :
     [ `Unchecked ] C_style_frontend.t ->
     [ `Sanitized ] Desmos_output.t Or_error.t
+
+  val generate_javascript :
+    [ `Unchecked ] C_style_frontend.t -> Javascript_setup.t Or_error.t
 end
 
 (** Emulator that runs the program once it has been compiled to

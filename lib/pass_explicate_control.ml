@@ -157,14 +157,16 @@ let rec compile_statements ~cur_label ~default_next ~stmts_rev ~blocks_rev =
           compile_statements ~cur_label ~default_next
             ~stmts_rev:(stmt :: stmts_rev) ~blocks_rev rest)
 
-let compile C_style_registers.{ functions; main; global_registers } =
+let compile C_style_registers.{ functions; main; global_registers; _ } =
   Label_generator.reset label_gen;
   Register_func_instrs.
     {
       functions =
-        Map.map functions ~f:(fun { params; body; local_registers } ->
+        Map.mapi functions
+          ~f:(fun ~key:name ~data:{ params; body; local_registers } ->
             let entry_label =
-              Label_generator.generate ~desc:"function_entry" label_gen
+              Label_generator.generate
+                ~desc:[%string "%{name#Function_name}_entry"] label_gen
             in
             let blocks =
               compile_statements ~cur_label:entry_label ~default_next:None

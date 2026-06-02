@@ -31,7 +31,7 @@ let%expect_test "parse a simple program" =
            ((Compare Eq (Register w) (Num 2)) (Num 6))
            ((Compare Eq (Register w) (Num 3)) (Num 7))))
          (default (Num 8))))))
-     (info _))
+     (status _))
     |}]
 
 (* TODO: once error checking is handled better add tests for invalid syntax *)

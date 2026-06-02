@@ -3,6 +3,7 @@ open Languages
 open Types
 open Register_stack_instrs
 module Rset = Register.Set
+
 (* greedy algorithm to do as many instructions as possible at once within a block without changing any expressions (I don't know if this is actually optimal).
 
   the constraints are (suppose A is an instruction that comes before B):
@@ -10,7 +11,7 @@ module Rset = Register.Set
   - if A writes a register and B reads it, A must always stay before B
   - if A and B both write a register, A must always stay before B so the correct value is there in the end
 
-  the algorithm I will use is:
+  the algorithm I'm using is:
   - start with a set of all unused instructions
   - for each instruction, iterate over all instructions that come after it and remove them from the set if they cannot happen at the same time
   - everything remaining can be merged together
@@ -24,8 +25,8 @@ type read_write_info = { read : Rset.t; write : Rset.t }
 
 let intersection_is_nonempty a b = not (Set.is_empty (Set.inter a b))
 
-let rec registers_from_expr = function
-  | Register_stack_instrs.Register r -> Register.Set.singleton r
+let rec registers_from_expr : expr -> Rset.t = function
+  | Register r -> Register.Set.singleton r
   | Num _ | Bool _ -> Register.Set.empty
   | Add (a, b)
   | Sub (a, b)
@@ -111,8 +112,9 @@ let construct_stmts stmts =
   |> helper
   |> List.map ~f:apply_constructor
 
+(* TODO: remove this if statement*)
 let compile { blocks; registers } =
-  if true then { blocks; registers }
+  if false then { blocks; registers }
   else
     {
       blocks =

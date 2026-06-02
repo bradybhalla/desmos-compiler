@@ -1,5 +1,23 @@
 open! Core
 
+module Desmos_slider_args = struct
+  type t = unit [@@deriving sexp]
+
+  let default = ()
+end
+
+module Desmos_point_args = struct
+  type t = unit [@@deriving sexp]
+
+  let default = ()
+end
+
+module Desmos_line_args = struct
+  type t = unit [@@deriving sexp]
+
+  let default = ()
+end
+
 module Register =
   String_id.Make
     (struct

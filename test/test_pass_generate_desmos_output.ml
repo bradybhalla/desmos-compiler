@@ -9,31 +9,99 @@ open Languages
 (* TODO brady: why did I comment this out? I can probably uncomment. *)
 
 let compile prog =
-  prog |> Utils.read_from_str |> Cumulative_passes.sanitize_register_names
+  prog |> Utils.read_from_str |> Cumulative_passes.generate_desmos_output
   |> ok_exn
 
 let print_sexp compiled =
-  compiled |> [%sexp_of: [ `Sanitized ] Desmos_output.t] |> print_s
+  compiled |> [%sexp_of: [ `Unsanitized ] Desmos_output.t] |> print_s
 
-let print_js compiled =
-  compiled |> Desmos_output.to_pastable_javascript |> print_endline
-
-let%expect_test "0 instructions" =
-  let prog = compile {| |} in
+let%expect_test "simple program" =
+  let prog =
+    compile
+      {|
+    (def f (x) (
+      (return (??
+        (x == 0) 1
+        default (x * (f (x - 1)))))
+    ))
+  |}
+  in
   print_sexp prog;
   [%expect
     {|
     ((program_action
-      ((conds (((Eq (Register 00pc) (Num 0)) ((00pc (Num -1))))))
+      ((conds
+        (((Eq (Register 00pc) (Num 0)) ((00pc (Num -1))))
+         ((Eq (Register 00pc) (Num 1))
+          ((00pc
+            (If_expr (conds (((Eq (Register 1local_x_0) (Num 0)) (Num 2))))
+             (default (Num 4))))))
+         ((Eq (Register 00pc) (Num 2))
+          ((00pc (Add (Register 00pc) (Num 1)))
+           (1local_1extract_ifexpr_1_1 (Num 1))))
+         ((Eq (Register 00pc) (Num 3))
+          ((00pc (If_expr (conds ()) (default (Num 10))))))
+         ((Eq (Register 00pc) (Num 4))
+          ((00pc (Add (Register 00pc) (Num 1)))
+           (21local_x_0Stack
+            (ListJoin (Register 21local_x_0Stack) (Register 1local_x_0)))
+           (1local_x_0 (Sub (Register 1local_x_0) (Num 1)))
+           (21local_1extract_call_0_2Stack
+            (ListJoin (Register 21local_1extract_call_0_2Stack)
+             (Register 1local_1extract_call_0_2)))
+           (21local_1extract_ifexpr_1_1Stack
+            (ListJoin (Register 21local_1extract_ifexpr_1_1Stack)
+             (Register 1local_1extract_ifexpr_1_1)))))
+         ((Eq (Register 00pc) (Num 5))
+          ((200pcStack (ListJoin (Register 200pcStack) (Num 6))) (00pc (Num 1))))
+         ((Eq (Register 00pc) (Num 6))
+          ((00pc (Add (Register 00pc) (Num 1)))
+           (1local_1extract_call_0_2
+            (ListIndex (Register 21local_1extract_call_0_2Stack)
+             (ListLength (Register 21local_1extract_call_0_2Stack))))
+           (21local_1extract_call_0_2Stack
+            (ListSlice (Register 21local_1extract_call_0_2Stack) (Num 1)
+             (Sub (ListLength (Register 21local_1extract_call_0_2Stack)) (Num 1))))
+           (1local_1extract_ifexpr_1_1
+            (ListIndex (Register 21local_1extract_ifexpr_1_1Stack)
+             (ListLength (Register 21local_1extract_ifexpr_1_1Stack))))
+           (21local_1extract_ifexpr_1_1Stack
+            (ListSlice (Register 21local_1extract_ifexpr_1_1Stack) (Num 1)
+             (Sub (ListLength (Register 21local_1extract_ifexpr_1_1Stack))
+              (Num 1))))
+           (1local_x_0
+            (ListIndex (Register 21local_x_0Stack)
+             (ListLength (Register 21local_x_0Stack))))
+           (21local_x_0Stack
+            (ListSlice (Register 21local_x_0Stack) (Num 1)
+             (Sub (ListLength (Register 21local_x_0Stack)) (Num 1))))))
+         ((Eq (Register 00pc) (Num 7))
+          ((00pc (Add (Register 00pc) (Num 1)))
+           (1local_1extract_call_0_2 (Register 00ret))))
+         ((Eq (Register 00pc) (Num 8))
+          ((00pc (Add (Register 00pc) (Num 1)))
+           (1local_1extract_ifexpr_1_1
+            (Mult (Register 1local_x_0) (Register 1local_1extract_call_0_2)))))
+         ((Eq (Register 00pc) (Num 9))
+          ((00pc (If_expr (conds ()) (default (Num 10))))))
+         ((Eq (Register 00pc) (Num 10))
+          ((00ret (Register 1local_1extract_ifexpr_1_1))
+           (00pc
+            (ListIndex (Register 200pcStack) (ListLength (Register 200pcStack))))
+           (200pcStack
+            (ListSlice (Register 200pcStack) (Num 1)
+             (Sub (ListLength (Register 200pcStack)) (Num 1))))))))
        (default ((00pc (Register 00pc))))))
      (init_registers
       ((00pc (Num 0)) (200pcStack (ListLiteral ((Num 5.4321))))
-       (00ret (Num 1.2345)) (200retStack (ListLiteral ((Num 5.4321))))))
-     (info Sanitized))
-    |}];
-  print_js prog;
-  [%expect
-    {| Calc.setExpressions([{latex: "M_{ain} = \\left\\{R_{00pc} = 0: R_{00pc}\\to -1, R_{00pc}\\to R_{00pc}\\right\\}"}, {latex: "R_{eset} = \\left(R_{00pc}\\to 0, R_{200pcStack}\\to \\left[5.4321\\right], R_{00ret}\\to 1.2345, R_{200retStack}\\to \\left[5.4321\\right]\\right)"}, {latex: "R_{00pc}=0"}, {latex: "R_{200pcStack}=\\left[5.4321\\right]"}, {latex: "R_{00ret}=1.2345"}, {latex: "R_{200retStack}=\\left[5.4321\\right]"}]) |}]
+       (00ret (Num 1.2345)) (200retStack (ListLiteral ((Num 5.4321))))
+       (1local_1extract_call_0_2 (Num 1.2345))
+       (21local_1extract_call_0_2Stack (ListLiteral ((Num 5.4321))))
+       (1local_1extract_ifexpr_1_1 (Num 1.2345))
+       (21local_1extract_ifexpr_1_1Stack (ListLiteral ((Num 5.4321))))
+       (1local_x_0 (Num 1.2345)) (21local_x_0Stack (ListLiteral ((Num 5.4321))))))
+     (status Unsanitized))
+    |}]
 
 (* let%expect_test "multiple instructions" = *)
 (*   let prog = *)

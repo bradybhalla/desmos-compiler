@@ -3,8 +3,9 @@ open Desmos_compiler
 
 let check str =
   match
-    str |> Utils.read_from_str |> Passes.check_function_defs |> ok_exn
-    |> Passes.extract_function_calls_and_defs |> Passes.check_variables_scopes
+    str |> Utils.read_from_str |> Passes.check_function_defs_and_plotting
+    |> ok_exn |> Passes.extract_functions_and_plotting
+    |> Passes.check_variables_scopes
   with
   | Ok _ -> print_endline "ok"
   | Error e -> print_endline (Error.to_string_hum e)
@@ -27,7 +28,7 @@ let%expect_test "errors on using undeclared" =
   check {|
     (decl y)
     (set y x)
-    (decl y)
+    (decl x)
     |};
   [%expect {| ("variable not declared in scope" x) |}]
 
@@ -98,3 +99,39 @@ let%expect_test "errors on globally using variable declared in function" =
     (set x 1)
     |};
   [%expect {| ("variable not declared in scope" x) |}]
+
+let%expect_test "desmos decl variable can be used without declaring" =
+  check {|
+    (#decl x 0)
+    (set x 1)
+    |};
+  [%expect {| ok |}]
+
+let%expect_test "plotting can reference globals declared after it" =
+  check {|
+    (@point x y)
+    (decl x)
+    (decl y)
+    |};
+  [%expect {| ok |}]
+
+let%expect_test "plotting can reference desmos decl variables" =
+  check {|
+    (#decl x 0)
+    (@point x 1)
+    |};
+  [%expect {| ok |}]
+
+let%expect_test "not allowed to declare global variable and desmos decl" =
+  check {|
+    (#decl x 0)
+    (decl x)
+    |};
+  [%expect {| ("variable already declared in this scope" x) |}]
+
+let%expect_test "can reference desmos decl even if its defined later" =
+  check {|
+    (set x 1)
+    (#decl x 0)
+    |};
+  [%expect {| ok |}]

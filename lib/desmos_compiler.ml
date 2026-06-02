@@ -4,10 +4,10 @@ module Languages = Languages
 module Desmos_vm_emulator = Desmos_vm_emulator
 
 module Passes = struct
-  let check_function_defs = Pass_check_function_defs.compile
+  let check_function_defs_and_plotting = Pass_check_function_defs_and_plotting.compile
 
-  let extract_function_calls_and_defs =
-    Pass_extract_function_calls_and_defs.compile
+  let extract_functions_and_plotting =
+    Pass_extract_functions_and_plotting.compile
 
   let check_variables_scopes = Pass_check_variable_scopes.compile
   let rename_local_variables = Pass_rename_local_variables.compile
@@ -17,18 +17,19 @@ module Passes = struct
   let make_program_counter_explicit = Pass_make_program_counter_explicit.compile
   let generate_desmos_output = Pass_generate_desmos_output.compile
   let sanitize_register_names = Pass_sanitize_register_names.compile
+  let generate_javascript = Pass_generate_javascript.compile
 end
 
 module Cumulative_passes = struct
   open Or_error.Let_syntax
 
-  let check_function_defs prog = prog |> Passes.check_function_defs
+  let check_function_defs_and_plotting prog = prog |> Passes.check_function_defs_and_plotting
 
-  let extract_function_calls_and_defs prog =
-    prog |> check_function_defs >>| Passes.extract_function_calls_and_defs
+  let extract_functions_and_plotting prog =
+    prog |> check_function_defs_and_plotting >>| Passes.extract_functions_and_plotting
 
   let check_variables_scopes prog =
-    prog |> extract_function_calls_and_defs >>= Passes.check_variables_scopes
+    prog |> extract_functions_and_plotting >>= Passes.check_variables_scopes
 
   let rename_local_variables prog =
     prog |> check_variables_scopes >>| Passes.rename_local_variables
@@ -50,4 +51,7 @@ module Cumulative_passes = struct
 
   let sanitize_register_names prog =
     prog |> generate_desmos_output >>| Passes.sanitize_register_names
+
+  let generate_javascript prog =
+    prog |> sanitize_register_names >>| Passes.generate_javascript
 end

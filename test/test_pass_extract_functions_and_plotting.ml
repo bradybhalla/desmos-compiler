@@ -4,7 +4,7 @@ open Languages
 
 let compile prog =
   prog |> Utils.read_from_str
-  |> Cumulative_passes.extract_function_calls_and_defs |> ok_exn
+  |> Cumulative_passes.extract_functions_and_plotting |> ok_exn
   |> [%sexp_of: [ `Unchecked ] C_style_separated_functions.t] |> print_s
 
 let%expect_test "toplevel function defs extracted correctly" =
@@ -16,7 +16,8 @@ let%expect_test "toplevel function defs extracted correctly" =
   [%expect
     {|
     ((functions ((f ((params (x)) (body ((Return (Register x))))))))
-     (main ((Set y (Num 5)))) (info Unchecked))
+     (main ((Set y (Num 5)))) (status Unchecked) (desmos_decls ())
+     (desmos_plot ()))
     |}]
 
 let%expect_test "nested function calls extracted into separate statements" =
@@ -31,7 +32,7 @@ let%expect_test "nested function calls extracted into separate statements" =
        (Call (func_name g) (args ((Register 1extract_call_0)))
         (ret (1extract_call_1)))
        (Call (func_name f) (args ((Register 1extract_call_1))) (ret ()))))
-     (info Unchecked))
+     (status Unchecked) (desmos_decls ()) (desmos_plot ()))
     |}]
 
 let%expect_test "nested binary expressions extract function calls left to right"
@@ -58,7 +59,7 @@ let%expect_test "nested binary expressions extract function calls left to right"
           (Sub (Add (Register 1extract_call_1) (Register 1extract_call_2))
            (Register 1extract_call_3)))
          (Register 1extract_call_4)))))
-     (info Unchecked))
+     (status Unchecked) (desmos_decls ()) (desmos_plot ()))
     |}]
 
 let%expect_test "function call extracted from while condition" =
@@ -72,7 +73,7 @@ let%expect_test "function call extracted from while condition" =
        (While (cond (Register 1extract_call_0))
         (body
          ((Call (func_name f) (args ((Register x))) (ret (1extract_call_0))))))))
-     (info Unchecked))
+     (status Unchecked) (desmos_decls ()) (desmos_plot ()))
     |}]
 
 let%expect_test "function call extracted from first if condition" =
@@ -88,7 +89,7 @@ let%expect_test "function call extracted from first if condition" =
        (Call (func_name f) (args ((Register x))) (ret (1extract_call_0)))
        (If (branches (((Register 1extract_call_0) ((Set y (Num 1))))))
         (else_ ()))))
-     (info Unchecked))
+     (status Unchecked) (desmos_decls ()) (desmos_plot ()))
     |}]
 
 let%expect_test "function call extracted from many if conditions" =
@@ -124,7 +125,7 @@ let%expect_test "function call extracted from many if conditions" =
              (Call (func_name f) (args ((Num 1))) (ret (1extract_call_2)))
              (If (branches (((Register 1extract_call_2) ((Set y (Num 4))))))
               (else_ ((Set y (Num 5)))))))))))))
-     (info Unchecked))
+     (status Unchecked) (desmos_decls ()) (desmos_plot ()))
     |}]
 
 let%expect_test "function call in And/Or respects short circuiting" =
@@ -187,5 +188,5 @@ let%expect_test "function call in And/Or respects short circuiting" =
            (else_ ((Set 1extract_and_12 (Bool false)))))
           (Set 1extract_or_13 (Register 1extract_and_12)))))
        (Set y (Register 1extract_or_13))))
-     (info Unchecked))
+     (status Unchecked) (desmos_decls ()) (desmos_plot ()))
     |}]

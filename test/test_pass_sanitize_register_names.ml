@@ -48,5 +48,5 @@ let%expect_test "sanitize register names" =
        (aa (Num 1.2345)) (2aaStack (ListLiteral ((Num 5.4321))))
        (aa00000 (Num 1.2345)) (2aaStack00000 (ListLiteral ((Num 5.4321))))
        (aaa (Num 1.2345)) (2aaaStack (ListLiteral ((Num 5.4321))))))
-     (info Sanitized))
+     (status Sanitized))
     |}]

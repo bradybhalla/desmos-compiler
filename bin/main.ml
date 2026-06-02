@@ -12,12 +12,9 @@ let desmos_cmd =
     (let%map_open.Command file = anon ("file" %: string) in
      fun () ->
        let prog = file |> Sexp.load_sexps |> C_style_frontend.parse_ast in
-       let js =
-         prog |> Cumulative_passes.sanitize_register_names
-         >>| Languages.Desmos_output.to_pastable_javascript
-       in
+       let js = prog |> Cumulative_passes.generate_javascript in
        match js with
-       | Ok js -> print_endline js
+       | Ok js -> print_endline (Javascript_setup.to_string js)
        | Error _ -> print_s [%sexp (js : _ Or_error.t)])
 
 let emulator_cmd =
@@ -50,22 +47,20 @@ let passes =
       fun prog ->
         prog |> parse |> [%sexp_of: [ `Unchecked ] C_style_frontend.t]
         |> print_s );
-    ( "check-function-defs",
+    ( "check-function-defs-and-plotting",
       fun prog ->
-        prog |> parse |> Cumulative_passes.check_function_defs
-        |> [%sexp_of: [ `Checked_function_defs ] C_style_frontend.t Or_error.t]
-        |> print_s );
-    ( "extract-function-calls-and-defs",
+        prog |> parse |> Cumulative_passes.check_function_defs_and_plotting
+        |> [%sexp_of: [ `Valid ] C_style_frontend.t Or_error.t] |> print_s );
+    ( "extract-functions-and-plotting",
       fun prog ->
-        prog |> parse |> Cumulative_passes.extract_function_calls_and_defs
+        prog |> parse |> Cumulative_passes.extract_functions_and_plotting
         |> [%sexp_of: [ `Unchecked ] C_style_separated_functions.t Or_error.t]
         |> print_s );
     ( "check-variables-scopes",
       fun prog ->
         prog |> parse |> Cumulative_passes.check_variables_scopes
-        |> [%sexp_of:
-             [ `Checked_variable_scopes ] C_style_separated_functions.t
-             Or_error.t] |> print_s );
+        |> [%sexp_of: [ `Valid ] C_style_separated_functions.t Or_error.t]
+        |> print_s );
     ( "rename-local-variables",
       fun prog ->
         prog |> parse |> Cumulative_passes.rename_local_variables
@@ -94,6 +89,10 @@ let passes =
       fun prog ->
         prog |> parse |> Cumulative_passes.sanitize_register_names
         |> [%sexp_of: [ `Sanitized ] Desmos_output.t Or_error.t] |> print_s );
+    ( "generate-javascript",
+      fun prog ->
+        prog |> parse |> Cumulative_passes.generate_javascript
+        |> [%sexp_of: Javascript_setup.t Or_error.t] |> print_s );
   ]
 
 let debug_all_passes =

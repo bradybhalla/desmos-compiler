@@ -11,7 +11,7 @@ let compile_frontend_to_vm prog =
 
 let compile_vm_to_javascript prog =
   prog |> Passes.generate_desmos_output |> Passes.sanitize_register_names
-  |> Desmos_output.to_pastable_javascript
+  |> Passes.generate_javascript
 
 let run_vm_and_get_ouptput ~output_reg_name prog =
   let emulator_state = Desmos_vm_emulator.run_until_done prog in

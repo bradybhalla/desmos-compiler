@@ -191,6 +191,7 @@ and compile_stmt = function
       let extracted_calls = List.concat extracted_calls in
       extracted_calls
       @ [ C_style_separated_functions.Call { func_name; args; ret = None } ]
+  | Desmos_decl _ | Desmos_point _ | Desmos_line _ -> []
 
 let extract_and_compile_function_defs = function
   | Function_def (name, params, stmts) ->
@@ -198,11 +199,43 @@ let extract_and_compile_function_defs = function
         ( name,
           C_style_separated_functions.
             { params; body = List.concat_map ~f:compile_stmt stmts } )
-  | Return _ | If _ | Set (_, _) | Decl _ | While (_, _) | Call (_, _) -> None
+  | Return _ | If _
+  | Set (_, _)
+  | Decl _
+  | While (_, _)
+  | Call (_, _)
+  | Desmos_decl _ | Desmos_point _ | Desmos_line _ ->
+      None
+
+let extract_desmos_decl = function
+  | C_style_frontend.Desmos_decl { reg; init; args } ->
+      Some C_style_separated_functions.{ reg; init; args }
+  | _ -> None
+
+let extract_desmos_plot = function
+  | C_style_frontend.Desmos_point { x; y; args } ->
+      Some
+        (C_style_separated_functions.Point
+           {
+             x = compile_expr_enforce_no_extracted_calls x;
+             y = compile_expr_enforce_no_extracted_calls y;
+             args;
+           })
+  | Desmos_line { x1; y1; x2; y2; args } ->
+      Some
+        (C_style_separated_functions.Line
+           {
+             x1 = compile_expr_enforce_no_extracted_calls x1;
+             y1 = compile_expr_enforce_no_extracted_calls y1;
+             x2 = compile_expr_enforce_no_extracted_calls x2;
+             y2 = compile_expr_enforce_no_extracted_calls y2;
+             args;
+           })
+  | _ -> None
 
 let compile
-    ({ C_style_frontend.stmts = program; info = `Checked_function_defs } :
-      [ `Checked_function_defs ] C_style_frontend.t) =
+    ({ C_style_frontend.stmts = program; status = `Valid } :
+      [ `Valid ] C_style_frontend.t) =
   Register_generator.reset register_gen;
   let functions =
     program
@@ -212,5 +245,7 @@ let compile
   {
     C_style_separated_functions.functions;
     main = List.concat_map ~f:compile_stmt program;
-    info = `Unchecked;
+    status = `Unchecked;
+    desmos_decls = List.filter_map ~f:extract_desmos_decl program;
+    desmos_plot = List.filter_map ~f:extract_desmos_plot program;
   }

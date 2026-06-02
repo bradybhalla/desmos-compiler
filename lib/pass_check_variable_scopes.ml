@@ -32,7 +32,7 @@ let rec check_expr ~ensure_in_scope =
       in
       check_expr ~ensure_in_scope default
 
-let check_stmts ~global_vars ~parent_vars =
+let check_stmts ~global_vars ~allow_shadow_globals ~parent_vars =
   let open Or_error.Let_syntax in
   let rec helper ~parent_vars ~cur_vars =
     let ensure_in_scope reg =
@@ -48,7 +48,10 @@ let check_stmts ~global_vars ~parent_vars =
     | stmt :: rest -> (
         match stmt with
         | C_style_separated_functions.Decl reg ->
-            if Set.mem cur_vars reg then
+            if
+              Set.mem cur_vars reg
+              || ((not allow_shadow_globals) && Set.mem global_vars reg)
+            then
               error_s
                 [%sexp
                   "variable already declared in this scope", (reg : Register.t)]
@@ -96,24 +99,60 @@ let check_stmts ~global_vars ~parent_vars =
   in
   helper ~parent_vars ~cur_vars:Register.Set.empty
 
-let compile { C_style_separated_functions.functions; main; info = `Unchecked } =
+let check_desmos_plot ~global_vars =
   let open Or_error.Let_syntax in
-  let%bind global_vars =
-    check_stmts ~global_vars:Register.Set.empty ~parent_vars:Register.Set.empty
-      main
+  let ensure_in_scope reg =
+    if Set.mem global_vars reg then Ok ()
+    else error_s [%sexp "variable not declared in scope", (reg : Register.t)]
   in
+  function
+  | C_style_separated_functions.Point { x; y; args = _ } ->
+      let%bind () = check_expr ~ensure_in_scope x in
+      check_expr ~ensure_in_scope y
+  | Line { x1; y1; x2; y2; args = _ } ->
+      let%bind () = check_expr ~ensure_in_scope x1 in
+      let%bind () = check_expr ~ensure_in_scope y1 in
+      let%bind () = check_expr ~ensure_in_scope x2 in
+      check_expr ~ensure_in_scope y2
+
+let compile
+    {
+      C_style_separated_functions.functions;
+      main;
+      desmos_decls;
+      desmos_plot;
+      status = `Unchecked;
+    } =
+  let open Or_error.Let_syntax in
+  let desmos_decl_vars =
+    List.map desmos_decls
+      ~f:(fun (d : C_style_separated_functions.desmos_decl) -> d.reg)
+    |> Register.Set.of_list
+  in
+  let%bind global_vars =
+    check_stmts ~global_vars:desmos_decl_vars ~allow_shadow_globals:false
+      ~parent_vars:Register.Set.empty main
+  in
+  let global_vars = Set.union global_vars desmos_decl_vars in
   let%bind () =
     functions |> Map.to_alist
     |> List.map ~f:(fun (_, { params; body }) ->
-           check_stmts ~global_vars
+           check_stmts ~global_vars ~allow_shadow_globals:true
              ~parent_vars:(Register.Set.of_list params)
              body
            |> Or_error.ignore_m)
+    |> Or_error.combine_errors_unit
+  in
+  let%bind () =
+    desmos_plot
+    |> List.map ~f:(check_desmos_plot ~global_vars)
     |> Or_error.combine_errors_unit
   in
   Ok
     {
       C_style_separated_functions.functions;
       main;
-      info = `Checked_variable_scopes;
+      desmos_decls;
+      desmos_plot;
+      status = `Valid;
     }

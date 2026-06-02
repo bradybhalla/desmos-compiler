@@ -1,46 +1,9 @@
 open! Core
-open Types
-
-let program_counter_reg = Register.of_string "00pc"
-
-type expr =
-  | Register of Register.t
-  | Num of float
-  | Add of expr * expr
-  | Sub of expr * expr
-  | Mult of expr * expr
-  | Div of expr * expr
-  | And of expr * expr
-  | Or of expr * expr
-  | Not of expr
-  | Mod of expr * expr
-  | ListJoin of expr * expr
-  | ListSlice of expr * expr * expr
-  | ListLength of expr
-  | ListIndex of expr * expr
-  | If_expr of { conds : (condition * expr) list; default : expr }
-  | ListLiteral of expr list
-[@@deriving sexp]
-
-and condition = Compare_op.t * expr * expr [@@deriving sexp]
-
-type set = Register.t * expr [@@deriving sexp]
-
-type action = { conds : (condition * set list) list; default : set list }
-[@@deriving sexp]
-
-type 'a t = { program_action : action; init_registers : set list; info : 'a }
-[@@deriving sexp]
-
-let get_stack_register reg =
-  (* TODO: right now nothing else should start with 2, but maybe there is a better way to enforce the uniqueness here *)
-  Register.of_string ("2" ^ Register.to_string reg ^ "Stack")
+open Languages
+open Desmos_output
 
 let latex_of_register reg =
-  let reg_name = Register.to_string reg in
-  (* TODO brady: get rid of bad symbols (just underscore?) I don't
-     think we should allow spaces or other weird things in the register
-     names. Other than underscore it should be the job of the frontend. *)
+  let reg_name = Types.Register.to_string reg in
   [%string "R_{%{reg_name}}"]
 
 let latex_wrap_lr left right latex = "\\left" ^ left ^ latex ^ "\\right" ^ right
@@ -95,7 +58,7 @@ and latex_of_cond (op, a, b) =
   let a_latex = latex_of_expr a in
   let b_latex = latex_of_expr b in
   match op with
-  | Compare_op.Eq -> a_latex ^ " = " ^ b_latex
+  | Types.Compare_op.Eq -> a_latex ^ " = " ^ b_latex
   (* TODO brady: do != in an easy way *)
   | Ne -> failwith "TODO"
   | Gt -> a_latex ^ " > " ^ b_latex
@@ -125,8 +88,9 @@ let latex_of_action { conds; default } =
       String.concat ~sep:", " conds_latex ^ ", " ^ latex_of_set_list default
       |> latex_wrap_lr "\\{" "\\}"
 
-let to_pastable_javascript
-    ({ program_action; init_registers; info = `Sanitized } : [ `Sanitized ] t) =
+let compile
+    ({ program_action; init_registers; status = `Sanitized } : [ `Sanitized ] t)
+    : Javascript_setup.t =
   let program_desmos_line = "M_{ain} = " ^ latex_of_action program_action in
   let reset_desmos_line =
     "R_{eset} = "

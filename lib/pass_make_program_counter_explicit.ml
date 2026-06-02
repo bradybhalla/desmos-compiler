@@ -3,8 +3,9 @@ open Languages
 open Types
 open Desmos_virtual_machine
 
-let rec compile_expr = function
-  | Register_stack_instrs.Register r -> Register r
+let rec compile_expr : Register_stack_instrs.expr -> Desmos_virtual_machine.expr
+    = function
+  | Register r -> Register r
   | Num n -> Num n
   | Bool b -> Bool b
   | Add (a, b) -> Add (compile_expr a, compile_expr b)

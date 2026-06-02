@@ -27,9 +27,23 @@ type stmt =
   | Decl of Register.t
   | While of expr * stmt list
   | Call of Function_name.t * expr list
+  | Desmos_decl of {
+      reg : Register.t;
+      init : float;
+      args : Desmos_slider_args.t;
+    }
+  | Desmos_point of { x : expr; y : expr; args : Desmos_point_args.t }
+  | Desmos_line of {
+      x1 : expr;
+      y1 : expr;
+      x2 : expr;
+      y2 : expr;
+      args : Desmos_line_args.t;
+    }
 [@@deriving sexp]
 
-type 'info t = { stmts : stmt list; info : 'info } [@@deriving sexp]
+type 'error_checking_status t = { stmts : stmt list; status : 'error_checking_status }
+[@@deriving sexp]
 
 (* TODO brady: check only has valid symbols and no keywords. should be added to parse_register_name and parse_function_name
 
@@ -51,6 +65,9 @@ type 'info t = { stmts : stmt list; info : 'info } [@@deriving sexp]
       default
 
  *)
+
+(* TODO brady: maybe make desmos variables upper case and program variables lower case? *)
+
 let parse_register_name = function
   | Sexp.Atom name -> Register.of_string name
   | _ -> failwith "expected register name"
@@ -122,9 +139,36 @@ let rec parse_statement = function
   | List [ Atom "decl"; register ] -> Decl (parse_register_name register)
   | List [ Atom "while"; cond; List body ] ->
       While (parse_expr cond, List.map ~f:parse_statement body)
+  | List [ Atom "#decl"; register; Atom initial_value ] ->
+      Desmos_decl
+        {
+          reg = parse_register_name register;
+          init =
+            (match Float.of_string_opt initial_value with
+            | Some f -> f
+            | None -> failwith "expected float as initial value");
+          args = Desmos_slider_args.default;
+        }
+  | List (Atom "#decl" :: _) -> failwith "invalid #decl"
+  | List [ Atom "@point"; x; y ] ->
+      Desmos_point
+        { x = parse_expr x; y = parse_expr y; args = Desmos_point_args.default }
+  | List (Atom "@point" :: _) -> failwith "invalid @point"
+  | List
+      [ Atom "@line"; List [ Atom "from"; x1; y1 ]; List [ Atom "to"; x2; y2 ] ]
+    ->
+      Desmos_line
+        {
+          x1 = parse_expr x1;
+          y1 = parse_expr y1;
+          x2 = parse_expr x2;
+          y2 = parse_expr y2;
+          args = Desmos_line_args.default;
+        }
+  | List (Atom "@line" :: _) -> failwith "invalid @line"
   | List (func :: args) ->
       Call (parse_function_name func, List.map ~f:parse_expr args)
   | _ -> failwith "expected statement"
 
 let parse_ast stmts : [ `Unchecked ] t =
-  { stmts = List.map ~f:parse_statement stmts; info = `Unchecked }
+  { stmts = List.map ~f:parse_statement stmts; status = `Unchecked }

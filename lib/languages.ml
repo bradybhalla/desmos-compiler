@@ -1,20 +1,13 @@
 open! Core
 open Types
 
-let link_register = Register.of_string "00link"
+(* TODO brady: find a better place to put these special registers *)
 let program_counter_reg = Register.of_string "00pc"
 let return_register = Register.of_string "00ret"
 
-(* TODO brady: after lists exist, it would be nice to have a "for" construct
-   over a range.
-
-   (for i (1..5)
-      (set j (/ i 2))
-      (update j))
-
-   *)
-
 module C_style_frontend = Lang_c_style_frontend
+
+(* TODO brady: make binary operations a more general Binary_op of Bin_op * expr * expr so there is less boilerplate   *)
 
 (* if the conditions are pure then you can do can put them all in a list. if they have function calls in them then they need to be nested  *)
 module C_style_separated_functions = struct
@@ -48,13 +41,33 @@ module C_style_separated_functions = struct
       }
   [@@deriving sexp]
 
+  type desmos_decl = {
+    reg : Register.t;
+    init : float;
+    args : Desmos_slider_args.t;
+  }
+  [@@deriving sexp]
+
+  type desmos_plot =
+    | Point of { x : expr; y : expr; args : Desmos_point_args.t }
+    | Line of {
+        x1 : expr;
+        y1 : expr;
+        x2 : expr;
+        y2 : expr;
+        args : Desmos_line_args.t;
+      }
+  [@@deriving sexp]
+
   type function_def = { params : Register.t list; body : stmt list }
   [@@deriving sexp]
 
-  type 'a t = {
+  type 'error_checking_status t = {
     functions : function_def Function_name.Map.t;
     main : stmt list;
-    info : 'a;
+    status : 'error_checking_status;
+    desmos_decls : desmos_decl list;
+    desmos_plot : desmos_plot list;
   }
   [@@deriving sexp]
 end
@@ -81,10 +94,15 @@ module C_style_registers = struct
   }
   [@@deriving sexp]
 
+  type desmos_decl = C_style_separated_functions.desmos_decl [@@deriving sexp]
+  type desmos_plot = C_style_separated_functions.desmos_plot [@@deriving sexp]
+
   type t = {
     functions : function_def Function_name.Map.t;
     main : stmt list;
     global_registers : Register.Set.t;
+    desmos_decls : desmos_decl list;
+    desmos_plot : desmos_plot list;
   }
   [@@deriving sexp]
 end
@@ -150,21 +168,7 @@ end
 (** Register-based instruction set that has a per-register stack (instead of
     functions). *)
 module Register_stack_instrs = struct
-  type expr =
-    | Register of Register.t
-    | Num of float
-    | Bool of bool
-    | Add of expr * expr
-    | Sub of expr * expr
-    | Mult of expr * expr
-    | Div of expr * expr
-    | And of expr * expr
-    | Or of expr * expr
-    | Not of expr
-    | Mod of expr * expr
-    | Compare of Compare_op.t * expr * expr
-    | If_expr of { conds : (expr * expr) list; default : expr }
-  [@@deriving sexp]
+  type expr = Register_func_instrs.expr [@@deriving sexp]
 
   (* TODO brady: figure out which of the stack instrucitons are actually needed and remove others, propagate down *)
   type generalized_set_action = Set of expr | PushAndSet of expr | Push | Pop
@@ -220,11 +224,6 @@ module Desmos_virtual_machine = struct
     | Pop
   [@@deriving sexp]
 
-  (* TODO brady: for optimizations it might be kind of hard to determine if
-    two instructions can be combined (we need to search for pc -> pc+1).
-    maybe we need another intermediate language where there are Instructions
-    and ManualPCInstructions? Then we optimize there and have a small pass
-    turning it into this language? *)
   (* TODO brady: this Exit should be able to be represented as PC <- -1 or something, then we don't need a whole instruction *)
   type stmt = Instruction of (Register.t * generalized_set_action) list | Exit
   [@@deriving sexp]
@@ -235,6 +234,47 @@ module Desmos_virtual_machine = struct
   [@@deriving sexp]
 end
 
-module Desmos_output = Lang_desmos_output
 (** The output to desmos, including the runtime environment necessary to execute
     the program. *)
+module Desmos_output = struct
+  type expr =
+    | Register of Register.t
+    | Num of float
+    | Add of expr * expr
+    | Sub of expr * expr
+    | Mult of expr * expr
+    | Div of expr * expr
+    | And of expr * expr
+    | Or of expr * expr
+    | Not of expr
+    | Mod of expr * expr
+    | ListJoin of expr * expr
+    | ListSlice of expr * expr * expr
+    | ListLength of expr
+    | ListIndex of expr * expr
+    | If_expr of { conds : (condition * expr) list; default : expr }
+    | ListLiteral of expr list
+  [@@deriving sexp]
+
+  and condition = Compare_op.t * expr * expr [@@deriving sexp]
+
+  type set = Register.t * expr [@@deriving sexp]
+
+  type action = { conds : (condition * set list) list; default : set list }
+  [@@deriving sexp]
+
+  type 'error_checking_status t = {
+    program_action : action;
+    init_registers : set list;
+    status : 'error_checking_status;
+  }
+  [@@deriving sexp]
+end
+
+(** The javascript calls to the Desmos API needed to set up the graph so it can
+    be run *)
+module Javascript_setup = struct
+  type t = string [@@deriving sexp]
+
+  let to_string = Fun.id
+end

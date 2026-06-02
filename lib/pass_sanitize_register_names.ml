@@ -65,7 +65,7 @@ let compile
     ({
        program_action = { conds; default };
        init_registers;
-       info = `Unsanitized;
+       status = `Unsanitized;
      } :
       [ `Unsanitized ] t) : [ `Sanitized ] t =
   let rename_map = build_rename_map init_registers in
@@ -79,5 +79,5 @@ let compile
         default = List.map default ~f:(rename_set rename_map);
       };
     init_registers = List.map init_registers ~f:(rename_set rename_map);
-    info = `Sanitized;
+    status = `Sanitized;
   }

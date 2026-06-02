@@ -145,9 +145,9 @@ let%expect_test "function where all branches return (nested if)" =
     {|
     ((functions
       ((f
-        ((entry_label explicate_control_function_entry_1) (params (1local_x_0))
+        ((entry_label explicate_control_f_entry_1) (params (1local_x_0))
          (blocks
-          (((label explicate_control_function_entry_1) (body ())
+          (((label explicate_control_f_entry_1) (body ())
             (control_flow
              (Jump
               (conds (((Bool true) explicate_control_if_statement_branch_3)))

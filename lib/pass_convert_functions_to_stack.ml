@@ -6,27 +6,8 @@ open Register_func_instrs
 
 let label_gen = Label_generator.create "convert_funcs_to_stack"
 
-let rec compile_expr = function
-  | Register r -> Register_stack_instrs.Register r
-  | Num n -> Num n
-  | Bool b -> Bool b
-  | Add (a, b) -> Add (compile_expr a, compile_expr b)
-  | Sub (a, b) -> Sub (compile_expr a, compile_expr b)
-  | Mult (a, b) -> Mult (compile_expr a, compile_expr b)
-  | Div (a, b) -> Div (compile_expr a, compile_expr b)
-  | And (a, b) -> And (compile_expr a, compile_expr b)
-  | Or (a, b) -> Or (compile_expr a, compile_expr b)
-  | Not e -> Not (compile_expr e)
-  | Mod (a, b) -> Mod (compile_expr a, compile_expr b)
-  | Compare (op, a, b) -> Compare (op, compile_expr a, compile_expr b)
-  | If_expr { conds; default } ->
-      Register_stack_instrs.If_expr
-        {
-          conds =
-            List.map conds ~f:(fun (cond, e) ->
-                (compile_expr cond, compile_expr e));
-          default = compile_expr default;
-        }
+(* TODO brady: these languages have the same expression type now, but leaving this here in case that changes in the future. If its not going to change this can be removed. *)
+let compile_expr = Fun.id
 
 let compile_control_flow = function
   | Jump { conds; default } ->
@@ -49,7 +30,7 @@ let compile_stmt ~(functions : function_def Function_name.Map.t)
         blocks_rev )
   | Call { func_name; args; ret } ->
       (* we need to save local registers if we are currently inside a function because we might end up in a recursive call. Functions have disjoint sets of registers so this is the only case where it matters. *)
-      (* TODO brady: we could make this more efficient by checking if we actually have the potential for a recursive call *)
+      (* TODO brady: we could make this more efficient by checking if we actually have the potential for a recursive call. another optimization would be to see which local registers are actually live at this point. some might not be used anymore so we don't care what happens to them. others will be written to before being read in the future so we don't care about those either. *)
       let need_to_save_registers =
         Option.value_map current_function ~default:Rset.empty ~f:(fun func ->
             (Map.find_exn functions func).local_registers)

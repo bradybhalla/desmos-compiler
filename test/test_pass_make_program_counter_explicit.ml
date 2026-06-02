@@ -68,14 +68,13 @@ let%expect_test "JumpLink compiles correctly" =
         (body
          ((Instruction
            ((00pc (Set (Add (Register 00pc) (Num 1)))) (a (Set (Num 1)))))
-          (Instruction ((00pc (Set (Add (Register 00pc) (Num 1))))))
           (Instruction
            ((00pc
              (PushExprAndSet (push (LabelLineNumber convert_funcs_to_stack_0))
-              (set (LabelLineNumber explicate_control_function_entry_1)))))))))
+              (set (LabelLineNumber explicate_control_func_entry_1)))))))))
        ((label convert_funcs_to_stack_0)
         (body ((Instruction ((00pc (Set (Add (Register 00pc) (Num 1)))))) Exit)))
-       ((label explicate_control_function_entry_1)
+       ((label explicate_control_func_entry_1)
         (body ((Instruction ((00ret (Set (Num 0))) (00pc Pop))))))))
      (registers ((00pc (Num 0)) (00ret (Num 1.2345)) (a (Num 1.2345)))))
     |}]
@@ -90,7 +89,7 @@ let%expect_test "return compiles correctly" =
     {|
     ((main
       (((label explicate_control_main_0) (body (Exit)))
-       ((label explicate_control_function_entry_1)
+       ((label explicate_control_return_test_entry_1)
         (body ((Instruction ((00ret (Set (Register 1local_b_0))) (00pc Pop))))))))
      (registers ((00pc (Num 0)) (00ret (Num 1.2345)) (1local_b_0 (Num 1.2345)))))
     |}]

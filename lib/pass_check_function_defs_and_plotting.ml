@@ -3,6 +3,32 @@ open Languages
 open Types
 open C_style_frontend
 
+(* TODO brady: rename "plotting" to "desmos" *)
+
+let rec expr_contains_call = function
+  | Unit | Register _ | Num _ | Bool _ -> false
+  | Add (a, b)
+  | Sub (a, b)
+  | Mult (a, b)
+  | Div (a, b)
+  | And (a, b)
+  | Or (a, b)
+  | Mod (a, b)
+  | Compare (_, a, b) ->
+      expr_contains_call a || expr_contains_call b
+  | Not e -> expr_contains_call e
+  | If_expr { conds; default } ->
+      List.exists conds ~f:(fun (c, e) ->
+          expr_contains_call c || expr_contains_call e)
+      || expr_contains_call default
+  | Call (_, _) -> true
+
+let check_no_calls_in_expr expr =
+  if expr_contains_call expr then
+    error_s
+      [%message "function calls not allowed in desmos plotting expressions"]
+  else Ok ()
+
 let extract_function_defs stmts =
   let open Or_error.Let_syntax in
   let rec check_nontoplevel ~returns_allowed = function
@@ -11,14 +37,13 @@ let extract_function_defs stmts =
         match stmt with
         | Function_def (name, _, _) ->
             error_s
-              [%sexp
-                "all functions must be at the toplevel",
-                (name : Function_name.t)]
+              [%message
+                "all functions must be at the toplevel" (name : Function_name.t)]
         | Return _ ->
             if not returns_allowed then
-              error_s [%sexp "returns only allowed inside a function"]
+              error_s [%message "returns only allowed inside a function"]
             else if not (List.is_empty rest) then
-              error_s [%sexp "unreachable code after return"]
+              error_s [%message "unreachable code after return"]
             else check_nontoplevel ~returns_allowed rest
         | If { branches; else_ } ->
             let%bind () =
@@ -32,12 +57,25 @@ let extract_function_defs stmts =
             let%bind () = check_nontoplevel ~returns_allowed body in
             check_nontoplevel ~returns_allowed rest
         | Set (_, _) | Call (_, _) | Decl _ ->
-            check_nontoplevel ~returns_allowed rest)
+            check_nontoplevel ~returns_allowed rest
+        | Desmos_decl _ | Desmos_point _ | Desmos_line _ ->
+            error_s [%message "desmos statements must be at the toplevel"])
   in
   let check_toplevel = function
     | Function_def (name, params, body) ->
         let%bind () = check_nontoplevel ~returns_allowed:true body in
         Ok [ (name, params, body) ]
+    | Desmos_decl _ -> Ok []
+    | Desmos_point { x; y; args = _ } ->
+        let%bind () = check_no_calls_in_expr x in
+        let%bind () = check_no_calls_in_expr y in
+        Ok []
+    | Desmos_line { x1; y1; x2; y2; args = _ } ->
+        let%bind () = check_no_calls_in_expr x1 in
+        let%bind () = check_no_calls_in_expr y1 in
+        let%bind () = check_no_calls_in_expr x2 in
+        let%bind () = check_no_calls_in_expr y2 in
+        Ok []
     | stmt ->
         let%bind () = check_nontoplevel ~returns_allowed:false [ stmt ] in
         Ok []
@@ -53,7 +91,8 @@ let check_function_returns func_name stmts =
     | [] -> Ok false
     | stmt :: rest -> (
         match stmt with
-        | Function_def (_, _, _) ->
+        | Desmos_decl _ | Desmos_point _ | Desmos_line _ | Function_def (_, _, _)
+          ->
             failwith
               "should have been caught already, so there is a bug in the \
                compiler"
@@ -72,9 +111,10 @@ let check_function_returns func_name stmts =
         | Set (_, _) | Call (_, _) | Decl _ -> helper rest)
   in
   if%bind helper stmts then Ok ()
-  else error_s [%sexp "function missing return", (func_name : Function_name.t)]
+  else
+    error_s [%message "function missing return" (func_name : Function_name.t)]
 
-let compile { stmts; info = `Unchecked } =
+let compile { stmts; status = `Unchecked } =
   let open Or_error.Let_syntax in
   (* get function definitions and make sure they are only in the toplevel. also
      make sure there are no returns in the toplevel. *)
@@ -86,7 +126,7 @@ let compile { stmts; info = `Unchecked } =
           Function_name.compare a b)
     with
     | Some (dup, _, _) ->
-        error_s [%sexp "duplicate function", (dup : Function_name.t)]
+        error_s [%message "duplicate function" (dup : Function_name.t)]
     | None -> Ok ()
   in
   (* make sure all paramter names are unique *)
@@ -95,10 +135,10 @@ let compile { stmts; info = `Unchecked } =
         match List.find_a_dup params ~compare:Register.compare with
         | Some dup ->
             error_s
-              [%sexp
-                "duplicate parameter",
-                (dup : Register.t),
-                (func_name : Function_name.t)]
+              [%message
+                "duplicate parameter"
+                  (dup : Register.t)
+                  (func_name : Function_name.t)]
         | None -> Ok ())
     |> Or_error.combine_errors_unit
   in
@@ -108,4 +148,4 @@ let compile { stmts; info = `Unchecked } =
         check_function_returns name body)
     |> Or_error.combine_errors_unit
   in
-  Ok { stmts; info = `Checked_function_defs }
+  Ok { stmts; status = `Valid }

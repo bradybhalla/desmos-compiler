@@ -15,6 +15,10 @@ let build_label_map blocks =
 let true_lit = Num 1.
 let false_lit = Num 0.
 
+let get_stack_register reg =
+  (* TODO: right now nothing else should start with 2, but maybe there is a better way to enforce the uniqueness here *)
+  Register.of_string ("2" ^ Register.to_string reg ^ "Stack")
+
 let rec compile_expr label_map = function
   | Desmos_virtual_machine.Register r -> Register r
   | LabelLineNumber lbl -> Num (Float.of_int (Map.find_exn label_map lbl))
@@ -120,4 +124,4 @@ let compile (program : Desmos_virtual_machine.t) =
              (get_stack_register reg, ListLiteral [ Num 5.4321 ]);
            ])
   in
-  { program_action; init_registers; info = `Unsanitized }
+  { program_action; init_registers; status = `Unsanitized }
