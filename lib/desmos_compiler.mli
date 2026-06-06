@@ -8,7 +8,7 @@ module Languages : sig
       variables, functions, while loops, if statements, and basic math
       expressions. *)
   module C_style_frontend : sig
-    type 'a t [@@deriving sexp_of]
+    type 'error_checking_status t [@@deriving sexp_of]
 
     val parse_ast : Sexp.t list -> [ `Unchecked ] t
   end
@@ -17,7 +17,7 @@ module Languages : sig
       functions stored separately from the main program. It also doesn't allow
       function calls to be inside of expressions. *)
   module C_style_separated_functions : sig
-    type 'a t [@@deriving sexp_of]
+    type 'error_checking_status t [@@deriving sexp_of]
   end
 
   (** An imperative language similar to the previous one but where all registers
@@ -63,7 +63,7 @@ module Languages : sig
   (** Desmos expressions that will simulate the program when the main action is
       repeatedly run. *)
   module Desmos_output : sig
-    type 'a t [@@deriving sexp_of]
+    type 'sanitized_register_status t [@@deriving sexp_of]
   end
 
   (** This language prints out JavaScript code that will insert all necessary
@@ -114,8 +114,6 @@ module Passes : sig
   (** Rename variables so each variable can be treated as a global register.
       Local variables from functions and inner scopes need to be renamed. *)
 
-  (* TODO plotting: after resolving previous todo, check variable scopes in plotting functions. points should just be global variables. parametric should be global vars plus the given parameter.  *)
-
   val explicate_control : C_style_registers.t -> Register_func_instrs.t
   (** Turn control flow (if/while) into jumps. This pass also changes the
       overall layout of the program from a list of statements to a list of
@@ -141,12 +139,10 @@ module Passes : sig
     Desmos_virtual_machine.t -> [ `Unsanitized ] Desmos_output.t
   (** Turn the virtual machine language into a representation of actual Desmos
       expressions. *)
-  (* TODO plotting: generate plotting statements desmos. parametric ones should rename the parameter with t. *)
 
   val sanitize_register_names :
     [ `Unsanitized ] Desmos_output.t -> [ `Sanitized ] Desmos_output.t
   (** Rename registers so they have valid Desmos names *)
-  (* TODO plotting: expand to plotting statements *)
 
   val generate_javascript : [ `Sanitized ] Desmos_output.t -> Javascript_setup.t
   (** Convert Desmos output to pastable JavaScript *)

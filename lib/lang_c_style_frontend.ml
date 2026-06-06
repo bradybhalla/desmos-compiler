@@ -42,7 +42,10 @@ type stmt =
     }
 [@@deriving sexp]
 
-type 'error_checking_status t = { stmts : stmt list; status : 'error_checking_status }
+type 'error_checking_status t = {
+  stmts : stmt list;
+  status : 'error_checking_status;
+}
 [@@deriving sexp]
 
 (* TODO brady: check only has valid symbols and no keywords. should be added to parse_register_name and parse_function_name

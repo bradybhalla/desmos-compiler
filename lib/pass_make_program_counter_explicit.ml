@@ -92,8 +92,8 @@ let compile_desmos_plot = function
           args;
         }
 
-let compile { Register_stack_instrs.blocks; registers; desmos_vars;
-              desmos_plots } =
+let compile
+    { Register_stack_instrs.blocks; registers; desmos_vars; desmos_plots } =
   let initial_registers =
     Set.add registers program_counter_reg
     |> Set.to_map ~f:(fun reg ->
@@ -102,9 +102,14 @@ let compile { Register_stack_instrs.blocks; registers; desmos_vars;
              (* TODO important: have a better way to handle initial register values *)
            else Num 1.2345)
   in
+  let initial_registers_with_desmos_decls =
+    List.fold desmos_vars ~init:initial_registers
+      ~f:(fun regs (decl : Desmos_virtual_machine.desmos_decl) ->
+        Map.set regs ~key:decl.reg ~data:(Num decl.init))
+  in
   {
     Desmos_virtual_machine.main = List.map blocks ~f:compile_block;
-    registers = initial_registers;
+    registers = initial_registers_with_desmos_decls;
     desmos_vars;
     desmos_plots = List.map desmos_plots ~f:compile_desmos_plot;
   }
