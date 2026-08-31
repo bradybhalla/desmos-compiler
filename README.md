@@ -5,9 +5,9 @@ A compiler for a simple imperative language that allows it to execute in the Des
 ## Example Usage
 
 - Compile a program
-    ```sh
-    dune exec desmos-compiler -- desmos test/programs/collatz.sexp
-    ```
+  ```sh
+  dune exec desmos-compiler -- desmos test/programs/collatz.sexp
+  ```
 - Open [www.desmos.com/calculator](https://www.desmos.com/calculator) and paste the output of the program into the JS console.
 - Run the program by EITHER
     - repeatedly clicking the "->" next to equation 1 until the value of equation 3 becomes "-1".
